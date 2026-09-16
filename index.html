@@ -669,7 +669,7 @@ nav.bottombar button.active .indicator{
     <h3 id="user-link-title"></h3>
     <div class="user-link-qr" id="user-link-qr"></div>
     <p id="user-link-text"></p>
-    <button onclick="copyUserLinkModal()">Скопіювати посилання</button>
+    <button id="user-link-copy-btn" onclick="copyUserLinkModal()">Скопіювати посилання</button>
     <button class="close-link-btn" onclick="closeUserLinkModal()">Закрити</button>
   </div>
 </div>
@@ -1757,8 +1757,10 @@ function downloadBlobFallback(byteArray, filename, mime){
 }
 
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
-// Прочитане сповіщення зникає зі списку повністю (не лише крапка з дзвіночка) —
-// відстежується локально на пристрої, у сервері нічого не видаляється.
+// Список показує все, що є за останні 30 днів (обмеження на бекенді,
+// NOTIF_MAX_AGE_DAYS) — прочитане не зникає одразу, а лишається видимим до
+// природного "зістарювання". "Прочитане" локально на пристрої відповідає
+// лише за крапку на дзвіночку, більше ні за що.
 var NOTIF_READ_KEY = 'nagorody_notif_read_ids';
 var notifItems = null;
 
@@ -1831,13 +1833,10 @@ function openDigest(){
   var body = document.getElementById('digest-body');
 
   function render(){
-    var readIds = getReadNotifIds();
-    var unread = notifItems.filter(function(it){ return readIds.indexOf(it.id) === -1; });
-
-    if (unread.length === 0) {
-      body.innerHTML = '<p class="placeholder-note">Немає нових сповіщень.</p>';
+    if (notifItems.length === 0) {
+      body.innerHTML = '<p class="placeholder-note">Немає сповіщень.</p>';
     } else {
-      body.innerHTML = unread.map(renderNotifCard).join('');
+      body.innerHTML = notifItems.map(renderNotifCard).join('');
     }
 
     markNotifIdsRead(notifItems.map(function(it){ return it.id; }));
@@ -2122,11 +2121,50 @@ function showAdminUserLink(id, name){
     });
 }
 
+// Копіювання з fallback: на деяких пристроях/браузерах navigator.clipboard
+// або відсутній, або мовчки падає без помилки — тому пробуємо сучасний спосіб,
+// а якщо не вдалось, одразу підстраховуємось через execCommand('copy').
+// Плюс видиме підтвердження на самій кнопці, щоб було зрозуміло, що спрацювало.
+function copyTextToClipboard(text){
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text).catch(function(){
+      return copyTextFallback(text);
+    });
+  }
+  return copyTextFallback(text);
+}
+
+function copyTextFallback(text){
+  return new Promise(function(resolve, reject){
+    try {
+      var ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      var ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      if (ok) resolve(); else reject(new Error('execCommand failed'));
+    } catch (e) {
+      reject(e);
+    }
+  });
+}
+
 function copyUserLinkModal(){
   var text = document.getElementById('user-link-text').textContent;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text);
-  }
+  var btn = document.getElementById('user-link-copy-btn');
+  var original = btn.textContent;
+
+  copyTextToClipboard(text).then(function(){
+    btn.textContent = '✓ Скопійовано';
+    setTimeout(function(){ btn.textContent = original; }, 1500);
+  }).catch(function(){
+    btn.textContent = 'Не вдалося скопіювати';
+    setTimeout(function(){ btn.textContent = original; }, 1500);
+  });
 }
 
 function closeUserLinkModal(){
