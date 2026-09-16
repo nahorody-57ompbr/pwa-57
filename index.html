@@ -815,7 +815,7 @@ nav.bottombar button.active .indicator{
         <button class="back-btn" onclick="navigate('home')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h2>Дайджест місяця</h2>
+        <h2>Сповіщення</h2>
       </div>
       <div id="digest-body"><div class="search-loading">Завантажую дайджест...</div></div>
     </section>
@@ -1036,6 +1036,17 @@ nav.bottombar button.active .indicator{
         </div>
         <button class="theme-btn active" style="width:100%;margin-top:12px;" onclick="submitAdminAddUser()">Додати користувача</button>
         <div id="admin-add-result" style="margin-top:10px;"></div>
+      </div>
+
+      <div class="card">
+        <p class="card-title">Додати сповіщення (що нового)</p>
+        <div class="search-input-row" style="margin-top:10px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+          <input type="text" id="admin-notif-title" placeholder="Заголовок">
+        </div>
+        <textarea id="admin-notif-text" rows="3" placeholder="Опис змін (необов'язково)" style="width:100%;margin-top:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface-2);color:var(--text-primary);font-size:13px;padding:10px 12px;font-family:inherit;resize:vertical;box-sizing:border-box;"></textarea>
+        <button class="theme-btn active" style="width:100%;margin-top:12px;" onclick="submitAdminAddChangelog()">Опублікувати</button>
+        <div id="admin-notif-result" style="margin-top:10px;"></div>
       </div>
 
       <div id="admin-body"><div class="search-loading">Завантажую...</div></div>
@@ -1745,23 +1756,73 @@ function downloadBlobFallback(byteArray, filename, mime){
   setTimeout(function(){ URL.revokeObjectURL(link.href); }, 5000);
 }
 
-// ---------- Щомісячний дайджест (дзвіночок) ----------
-var DIGEST_SEEN_KEY = 'nagorody_digest_seen_month';
-var digestData = null;
+// ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
+// Прочитане сповіщення зникає зі списку повністю (не лише крапка з дзвіночка) —
+// відстежується локально на пристрої, у сервері нічого не видаляється.
+var NOTIF_READ_KEY = 'nagorody_notif_read_ids';
+var notifItems = null;
+
+function getReadNotifIds(){
+  try { return JSON.parse(localStorage.getItem(NOTIF_READ_KEY) || '[]'); }
+  catch(e){ return []; }
+}
+
+function markNotifIdsRead(ids){
+  var current = getReadNotifIds();
+  ids.forEach(function(id){
+    if (current.indexOf(id) === -1) current.push(id);
+  });
+  if (current.length > 200) current = current.slice(current.length - 200); // не даємо списку розростатись
+  localStorage.setItem(NOTIF_READ_KEY, JSON.stringify(current));
+}
+
+function refreshNotifDot(items){
+  var readIds = getReadNotifIds();
+  var hasUnread = items.some(function(it){ return readIds.indexOf(it.id) === -1; });
+  var dot = document.getElementById('bell-dot');
+  if (dot) dot.style.display = hasUnread ? 'block' : 'none';
+}
 
 function loadDigest(){
-  var url = API_BASE_URL + '?action=digest&code=' + encodeURIComponent(getAuthCode());
+  var url = API_BASE_URL + '?action=notifications&code=' + encodeURIComponent(getAuthCode());
   fetch(url)
     .then(function(res){ return res.json(); })
     .then(function(data){
       if (data && data.ok) {
-        digestData = data;
-        var seen = localStorage.getItem(DIGEST_SEEN_KEY);
-        var dot = document.getElementById('bell-dot');
-        if (dot) dot.style.display = (seen !== data.monthKey && data.total > 0) ? 'block' : 'none';
+        notifItems = data.items;
+        refreshNotifDot(notifItems);
       }
     })
     .catch(function(){ /* тихо ігноруємо — дзвіночок просто лишиться без позначки */ });
+}
+
+function renderNotifCard(item){
+  if (item.type === 'digest') {
+    return '<div class="card digest-card" style="margin-bottom:12px;">' +
+      '<p style="font-size:19px;font-weight:800;color:var(--zoloto);text-transform:uppercase;letter-spacing:0.02em;margin:0 0 2px;">Дайджест нагород</p>' +
+      '<p class="body-note" style="margin:0 0 16px;">' + escapeHtml(item.monthLabel) + '</p>' +
+      '<p class="stats-metric-value" style="font-size:38px;">' + item.total + '</p>' +
+      '<p class="body-note" style="margin-top:2px;">наших побратимів і посестер отримали заслужені нагороди за минулий місяць</p>' +
+      '<div style="border-top:1px solid var(--border-soft); margin:16px 0;"></div>' +
+      '<p class="card-title" style="margin-bottom:5px;">Топ-нагорода місяця</p>' +
+      '<p class="body-note" style="font-weight:700;color:var(--text-primary);margin-bottom:16px;">' + escapeHtml(item.topAward) + '</p>' +
+      '<p class="card-title" style="margin-bottom:5px;">Найбільше нагороджених у</p>' +
+      '<p class="body-note" style="font-weight:700;color:var(--text-primary);">' + escapeHtml(item.topUnit) + '</p>' +
+      '<div style="border-top:1px solid var(--border-soft); margin:16px 0;"></div>' +
+      '<p class="body-note" style="text-align:center;">Дякуємо за службу! Слава Україні! ' +
+      '<svg width="16" height="11" viewBox="0 0 16 11" style="vertical-align:-1px; display:inline-block; border-radius:1px;">' +
+      '<rect width="16" height="5.5" y="0" fill="#0057B7"/>' +
+      '<rect width="16" height="5.5" y="5.5" fill="#FFD700"/>' +
+      '</svg>' +
+      '</p>' +
+      '</div>';
+  }
+
+  return '<div class="card" style="margin-bottom:12px;">' +
+    '<p class="card-title" style="margin-bottom:4px;">' + escapeHtml(item.title) + '</p>' +
+    '<p class="body-note" style="margin-bottom:10px;">' + escapeHtml(item.date) + '</p>' +
+    '<p class="body-note" style="color:var(--text-primary);">' + escapeHtml(item.text) + '</p>' +
+    '</div>';
 }
 
 function openDigest(){
@@ -1770,55 +1831,30 @@ function openDigest(){
   var body = document.getElementById('digest-body');
 
   function render(){
-    if (!digestData) {
-      body.innerHTML = '<p class="placeholder-note">Не вдалося завантажити дайджест.</p>';
-      return;
+    var readIds = getReadNotifIds();
+    var unread = notifItems.filter(function(it){ return readIds.indexOf(it.id) === -1; });
+
+    if (unread.length === 0) {
+      body.innerHTML = '<p class="placeholder-note">Немає нових сповіщень.</p>';
+    } else {
+      body.innerHTML = unread.map(renderNotifCard).join('');
     }
-    if (digestData.total === 0) {
-      body.innerHTML = '<p class="placeholder-note">За ' + escapeHtml(digestData.monthLabel) + ' нових нагороджень не було.</p>';
-      return;
-    }
-    body.innerHTML =
-      '<div class="card digest-card">' +
-      '<p style="font-size:19px;font-weight:800;color:var(--zoloto);text-transform:uppercase;letter-spacing:0.02em;margin:0 0 2px;">Дайджест нагород</p>' +
-      '<p class="body-note" style="margin:0 0 16px;">' + escapeHtml(digestData.monthLabel) + '</p>' +
 
-      '<p class="stats-metric-value" style="font-size:38px;">' + digestData.total + '</p>' +
-      '<p class="body-note" style="margin-top:2px;">наших побратимів і посестер отримали заслужені нагороди за минулий місяць</p>' +
-
-      '<div style="border-top:1px solid var(--border-soft); margin:16px 0;"></div>' +
-
-      '<p class="card-title" style="margin-bottom:5px;">Топ-нагорода місяця</p>' +
-      '<p class="body-note" style="font-weight:700;color:var(--text-primary);margin-bottom:16px;">' + escapeHtml(digestData.topAward) + '</p>' +
-
-      '<p class="card-title" style="margin-bottom:5px;">Найбільше нагороджених у</p>' +
-      '<p class="body-note" style="font-weight:700;color:var(--text-primary);">' + escapeHtml(digestData.topUnit) + '</p>' +
-
-      '<div style="border-top:1px solid var(--border-soft); margin:16px 0;"></div>' +
-
-      '<p class="body-note" style="text-align:center;">Дякуємо за службу! Слава Україні! ' +
-      '<svg width="16" height="11" viewBox="0 0 16 11" style="vertical-align:-1px; display:inline-block; border-radius:1px;">' +
-      '<rect width="16" height="5.5" y="0" fill="#0057B7"/>' +
-      '<rect width="16" height="5.5" y="5.5" fill="#FFD700"/>' +
-      '</svg>' +
-      '</p>' +
-      '</div>';
-
-    localStorage.setItem(DIGEST_SEEN_KEY, digestData.monthKey);
+    markNotifIdsRead(notifItems.map(function(it){ return it.id; }));
     var dot = document.getElementById('bell-dot');
     if (dot) dot.style.display = 'none';
   }
 
-  if (digestData) {
+  if (notifItems) {
     render();
   } else {
-    body.innerHTML = '<div class="search-loading">Завантажую дайджест...</div>';
-    var url = API_BASE_URL + '?action=digest&code=' + encodeURIComponent(getAuthCode());
+    body.innerHTML = '<div class="search-loading">Завантажую сповіщення...</div>';
+    var url = API_BASE_URL + '?action=notifications&code=' + encodeURIComponent(getAuthCode());
     fetch(url)
       .then(function(res){ return res.json(); })
       .then(function(data){
-        if (data && data.ok) { digestData = data; render(); }
-        else body.innerHTML = '<p class="placeholder-note">Не вдалося завантажити дайджест.</p>';
+        if (data && data.ok) { notifItems = data.items; render(); }
+        else body.innerHTML = '<p class="placeholder-note">Не вдалося завантажити сповіщення.</p>';
       })
       .catch(function(){
         body.innerHTML = '<p class="placeholder-note">Немає з\'єднання з сервером.</p>';
@@ -1994,6 +2030,41 @@ function submitAdminAddUser(){
         new QRCode(document.getElementById('admin-new-qr'), { text: data.link, width: 176, height: 176 });
       }
       openAdminStats();
+    })
+    .catch(function(){
+      resultBox.innerHTML = '<p class="body-note" style="color:#C0392B;">Немає з\'єднання з сервером.</p>';
+    });
+}
+
+function submitAdminAddChangelog(){
+  var titleInput = document.getElementById('admin-notif-title');
+  var textInput = document.getElementById('admin-notif-text');
+  var resultBox = document.getElementById('admin-notif-result');
+
+  var title = titleInput.value.trim();
+  var text = textInput.value.trim();
+
+  if (!title) {
+    resultBox.innerHTML = '<p class="body-note" style="color:#C0392B;">Введіть заголовок.</p>';
+    return;
+  }
+
+  resultBox.innerHTML = '<div class="search-loading">Публікую...</div>';
+
+  var url = API_BASE_URL + '?action=adminAddChangelog&code=' + encodeURIComponent(getAuthCode())
+    + '&title=' + encodeURIComponent(title)
+    + '&text=' + encodeURIComponent(text);
+
+  fetch(url)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      if (!data || !data.ok) {
+        resultBox.innerHTML = '<p class="body-note" style="color:#C0392B;">Не вдалося опублікувати.</p>';
+        return;
+      }
+      resultBox.innerHTML = '<p class="body-note">✓ Опубліковано. Користувачі побачать це на дзвіночку.</p>';
+      titleInput.value = '';
+      textInput.value = '';
     })
     .catch(function(){
       resultBox.innerHTML = '<p class="body-note" style="color:#C0392B;">Немає з\'єднання з сервером.</p>';
