@@ -590,7 +590,7 @@ nav.bottombar button.active .indicator{
 <body>
 <div id="offline-banner">Немає з'єднання — показані збережені дані</div>
 
-<div id="auth-gate">
+<div id="auth-gate" class="hidden">
   <div class="auth-box">
     <div class="emblem"><img src="icons/icon-192.png" alt="Емблема"></div>
     <h2>Нагороди 57 ОМПБр</h2>
@@ -1662,6 +1662,7 @@ document.addEventListener('visibilitychange', function(){
     // прибираємо код з адресного рядка одразу, щоб не лишався в історії/скріншотах
     var cleanUrl = location.origin + location.pathname + location.hash;
     history.replaceState(null, '', cleanUrl);
+    document.getElementById('auth-gate').classList.remove('hidden');
     document.querySelector('#auth-gate .auth-box').classList.add('autologin');
     checkAccessCode(urlCode);
     return;
@@ -1692,6 +1693,7 @@ document.addEventListener('visibilitychange', function(){
   }
 
   // 3. Нічого немає — показуємо форму ручного вводу коду
+  document.getElementById('auth-gate').classList.remove('hidden');
   document.getElementById('auth-code-input').focus();
 })();
 
