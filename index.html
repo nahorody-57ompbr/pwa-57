@@ -381,6 +381,13 @@ nav.bottombar button.active .indicator{
 }
 #auth-gate.hidden{display:none;}
 .auth-box{width:100%;max-width:340px;text-align:center;}
+/* Автовхід за персональним посиланням: ховаємо форму ручного вводу коду,
+   поки триває перевірка — щоб не блимав зайвий екран. Якщо код виявиться
+   нечинним, клас знімається і форма з'являється як резервний спосіб. */
+.auth-box.autologin #auth-code-input,
+.auth-box.autologin #auth-submit-btn,
+.auth-box.autologin .sub:not(.autologin-msg){display:none;}
+.auth-box.autologin .autologin-msg{display:block !important;}
 .auth-box .emblem{width:72px;height:72px;margin:0 auto 20px;}
 .auth-box .emblem img{width:100%;height:100%;object-fit:contain;}
 .auth-box h2{font-size:16px;margin:0 0 6px;text-transform:uppercase;letter-spacing:0.02em;}
@@ -588,6 +595,7 @@ nav.bottombar button.active .indicator{
     <div class="emblem"><img src="icons/icon-192.png" alt="Емблема"></div>
     <h2>Нагороди 57 ОМПБр</h2>
     <p class="sub">Введіть персональний код доступу, наданий адміністратором</p>
+    <p class="sub autologin-msg" style="display:none;">Входимо за посиланням...</p>
     <input type="text" id="auth-code-input" placeholder="Наприклад: A7K9X2QM" maxlength="12" autocomplete="off" autocapitalize="characters">
     <p class="auth-error" id="auth-error">Невірний код доступу. Перевірте і спробуйте ще раз.</p>
     <button class="btn-primary" id="auth-submit-btn" onclick="submitAuthCode()">Увійти</button>
@@ -986,7 +994,7 @@ nav.bottombar button.active .indicator{
         <button class="theme-btn active" style="width:100%;margin-top:8px;" onclick="showChangePinForm()" id="app-lock-change-btn">Змінити PIN</button>
       </div>
 
-      <a class="row-card" style="text-decoration:none;color:inherit;" onclick="openReportOverlay('')">
+      <a class="row-card" id="report-issue-item" style="text-decoration:none;color:inherit;" onclick="openReportOverlay('')">
         <div class="icon-wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
         </div>
@@ -1164,6 +1172,10 @@ function showApp(user, dataUpdatedAt){
   var adminItem = document.getElementById('admin-menu-item');
   if (adminItem) adminItem.style.display = user.isAdmin ? 'flex' : 'none';
 
+  // Адміну немає сенсу писати повідомлення про помилку самому собі
+  var reportItem = document.getElementById('report-issue-item');
+  if (reportItem) reportItem.style.display = user.isAdmin ? 'none' : 'flex';
+
   loadDigest();
 }
 
@@ -1185,6 +1197,9 @@ function setAuthLoading(isLoading){
 }
 
 function showAuthError(msg){
+  // Якщо посилання виявилось нечинним під час автовходу — знімаємо
+  // "автовхід" і показуємо форму ручного вводу як резервний спосіб.
+  document.querySelector('#auth-gate .auth-box').classList.remove('autologin');
   var el = document.getElementById('auth-error');
   el.textContent = msg || 'Невірний код доступу. Перевірте і спробуйте ще раз.';
   el.classList.add('show');
@@ -1647,6 +1662,7 @@ document.addEventListener('visibilitychange', function(){
     // прибираємо код з адресного рядка одразу, щоб не лишався в історії/скріншотах
     var cleanUrl = location.origin + location.pathname + location.hash;
     history.replaceState(null, '', cleanUrl);
+    document.querySelector('#auth-gate .auth-box').classList.add('autologin');
     checkAccessCode(urlCode);
     return;
   }
