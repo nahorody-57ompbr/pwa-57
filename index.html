@@ -1820,15 +1820,15 @@ function renderNotifCard(item){
   if (item.type === 'digest') {
     return '<div class="card digest-card" style="margin-bottom:12px;">' +
       '<p style="font-size:19px;font-weight:800;color:var(--zoloto);text-transform:uppercase;letter-spacing:0.02em;margin:0 0 2px;">Дайджест нагород</p>' +
-      '<p class="body-note" style="margin:0 0 16px;">' + escapeHtml(item.monthLabel) + '</p>' +
+      '<p class="body-note" style="margin:0 0 8px;">' + escapeHtml(item.monthLabel) + '</p>' +
       '<p class="stats-metric-value" style="font-size:38px;">' + item.total + '</p>' +
       '<p class="body-note" style="margin-top:2px;">наших побратимів і посестер отримали заслужені нагороди за минулий місяць</p>' +
-      '<div style="border-top:1px solid var(--border-soft); margin:16px 0;"></div>' +
-      '<p class="card-title" style="margin-bottom:5px;">Топ-нагорода місяця</p>' +
-      '<p class="body-note" style="font-weight:700;color:var(--text-primary);margin-bottom:16px;">' + escapeHtml(item.topAward) + '</p>' +
-      '<p class="card-title" style="margin-bottom:5px;">Найбільше нагороджених у</p>' +
+      '<div style="border-top:1px solid var(--border-soft); margin:10px 0;"></div>' +
+      '<p class="card-title" style="margin-bottom:3px;">Топ-нагорода місяця</p>' +
+      '<p class="body-note" style="font-weight:700;color:var(--text-primary);margin-bottom:8px;">' + escapeHtml(item.topAward) + '</p>' +
+      '<p class="card-title" style="margin-bottom:3px;">Найбільше нагороджених у</p>' +
       '<p class="body-note" style="font-weight:700;color:var(--text-primary);">' + escapeHtml(item.topUnit) + '</p>' +
-      '<div style="border-top:1px solid var(--border-soft); margin:16px 0;"></div>' +
+      '<div style="border-top:1px solid var(--border-soft); margin:10px 0;"></div>' +
       '<p class="body-note" style="text-align:center;">Дякуємо за службу! Слава Україні! ' +
       '<svg width="16" height="11" viewBox="0 0 16 11" style="vertical-align:-1px; display:inline-block; border-radius:1px;">' +
       '<rect width="16" height="5.5" y="0" fill="#0057B7"/>' +
@@ -2345,7 +2345,7 @@ function formatNotifText(text){
       html += '<li style="margin-bottom:4px;color:var(--text-primary);">' + trimmed.substring(2) + '</li>';
     } else {
       closeList();
-      if (trimmed) html += '<p class="body-note" style="color:var(--text-primary);margin:0 0 8px;">' + trimmed + '</p>';
+      if (trimmed) html += '<p class="body-note" style="color:var(--text-primary);margin:0 0 8px;text-indent:1.4em;">' + trimmed + '</p>';
     }
   });
   closeList();
