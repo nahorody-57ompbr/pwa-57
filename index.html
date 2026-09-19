@@ -1841,7 +1841,7 @@ function renderNotifCard(item){
   return '<div class="card" style="margin-bottom:12px;">' +
     '<p class="card-title" style="margin-bottom:4px;">' + escapeHtml(item.title) + '</p>' +
     '<p class="body-note" style="margin-bottom:10px;">' + escapeHtml(item.date) + '</p>' +
-    '<p class="body-note" style="color:var(--text-primary);">' + escapeHtml(item.text) + '</p>' +
+    formatNotifText(item.text) +
     '</div>';
 }
 
@@ -2323,6 +2323,33 @@ function escapeHtml(str){
   return String(str == null ? '' : str)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// Легка підтримка форматування для тексту сповіщень "що нового": **жирний**
+// та рядки, що починаються з "- " або "• ", стають маркованим списком.
+// Все інше лишається звичайним escape-текстом (жодного довільного HTML).
+function formatNotifText(text){
+  var escaped = escapeHtml(text).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+  var lines = escaped.split('\n');
+  var html = '';
+  var inList = false;
+
+  function closeList(){
+    if (inList) { html += '</ul>'; inList = false; }
+  }
+
+  lines.forEach(function(line){
+    var trimmed = line.trim();
+    if (trimmed.indexOf('- ') === 0 || trimmed.indexOf('• ') === 0) {
+      if (!inList) { html += '<ul style="margin:4px 0 8px 18px;padding:0;">'; inList = true; }
+      html += '<li style="margin-bottom:4px;color:var(--text-primary);">' + trimmed.substring(2) + '</li>';
+    } else {
+      closeList();
+      if (trimmed) html += '<p class="body-note" style="color:var(--text-primary);margin:0 0 8px;">' + trimmed + '</p>';
+    }
+  });
+  closeList();
+  return html;
 }
 
 function getAuthCode(){
