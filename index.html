@@ -2092,9 +2092,14 @@ function copyAdminLink(){
   var linkEl = document.getElementById('admin-new-link');
   if (!linkEl) return;
   var text = linkEl.textContent;
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(text);
-  }
+  var btn = linkEl.parentElement.querySelector('button');
+  var original = btn ? btn.textContent : '';
+
+  copyTextToClipboard(text).then(function(){
+    if (btn) { btn.textContent = '✓ Скопійовано'; setTimeout(function(){ btn.textContent = original; }, 1500); }
+  }).catch(function(){
+    if (btn) { btn.textContent = 'Не вдалося скопіювати'; setTimeout(function(){ btn.textContent = original; }, 1500); }
+  });
 }
 
 function confirmAdminDeleteUser(id, name){
