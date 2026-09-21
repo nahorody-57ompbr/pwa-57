@@ -1794,6 +1794,24 @@ function shareOrDownloadBlob(byteArray, filename, mime){
   downloadBlobFallback(byteArray, filename, mime);
 }
 
+// navigator.share() вимагає "свіжого" дотику (transient activation) — після
+// fetch(), який часто триває довше кількох секунд, браузер вважає дотик
+// застарілим і мовчки відмовляє. Тому замість виклику share() одразу після
+// завантаження даних кнопка перетворюється на "Поділитися" — і вже САМЕ ЦЕЙ,
+// другий дотик (без жодного fetch між ним і share()) відкриває вікно.
+function armShareButton(btn, byteArray, filename, mime){
+  var originalOnclick = btn.onclick;
+  var originalHTML = btn.innerHTML;
+
+  btn.disabled = false;
+  btn.innerHTML = '📤 Поділитися / Завантажити';
+  btn.onclick = function(){
+    shareOrDownloadBlob(byteArray, filename, mime);
+    btn.onclick = originalOnclick;
+    btn.innerHTML = originalHTML;
+  };
+}
+
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
 // Список показує все, що є за останні 30 днів (обмеження на бекенді,
 // NOTIF_MAX_AGE_DAYS) — прочитане не зникає одразу, а лишається видимим до
@@ -2501,12 +2519,7 @@ function downloadAwardCard(idx){
 
       var byteArray = byteArrayFromBase64(data.pdfBase64);
       var filename = data.filename || 'Нагородна_картка.pdf';
-      shareOrDownloadBlob(byteArray, filename, 'application/pdf');
-      btn.innerHTML = '✓ Готово';
-      setTimeout(function(){
-        btn.innerHTML = originalText;
-        btn.disabled = false;
-      }, 1500);
+      armShareButton(btn, byteArray, filename, 'application/pdf');
     })
     .catch(function(){
       btn.innerHTML = originalText;
@@ -3078,12 +3091,7 @@ function downloadStatsAwardXlsx(btn){
         return;
       }
       var byteArray = byteArrayFromBase64(data.xlsxBase64);
-      shareOrDownloadBlob(byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      btn.textContent = '✓ Готово';
-      setTimeout(function(){
-        btn.textContent = originalText;
-        btn.disabled = false;
-      }, 1500);
+      armShareButton(btn, byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     })
     .catch(function(err){
       btn.textContent = originalText;
@@ -3442,12 +3450,7 @@ function downloadStatsFile(action, unitName, field, mime, btn){
 
       var byteArray = byteArrayFromBase64(data[field]);
       var filename = data.filename || 'Звіт';
-      shareOrDownloadBlob(byteArray, filename, mime);
-      btn.textContent = '✓ Готово';
-      setTimeout(function(){
-        btn.textContent = originalText;
-        btn.disabled = false;
-      }, 1500);
+      armShareButton(btn, byteArray, filename, mime);
     })
     .catch(function(err){
       btn.textContent = originalText;
