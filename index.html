@@ -1799,16 +1799,18 @@ function shareOrDownloadBlob(byteArray, filename, mime){
 // застарілим і мовчки відмовляє. Тому замість виклику share() одразу після
 // завантаження даних кнопка перетворюється на "Поділитися" — і вже САМЕ ЦЕЙ,
 // другий дотик (без жодного fetch між ним і share()) відкриває вікно.
-function armShareButton(btn, byteArray, filename, mime){
+// originalLabel передається явно (а не зчитується з кнопки в цей момент),
+// бо на момент виклику кнопка вже показує "Формую..." — інакше саме цей
+// текст і лишився б назавжди після повторного натискання.
+function armShareButton(btn, byteArray, filename, mime, originalLabel){
   var originalOnclick = btn.onclick;
-  var originalHTML = btn.innerHTML;
 
   btn.disabled = false;
   btn.innerHTML = '📤 Поділитися / Завантажити';
   btn.onclick = function(){
     shareOrDownloadBlob(byteArray, filename, mime);
     btn.onclick = originalOnclick;
-    btn.innerHTML = originalHTML;
+    btn.innerHTML = originalLabel;
   };
 }
 
@@ -2519,7 +2521,7 @@ function downloadAwardCard(idx){
 
       var byteArray = byteArrayFromBase64(data.pdfBase64);
       var filename = data.filename || 'Нагородна_картка.pdf';
-      armShareButton(btn, byteArray, filename, 'application/pdf');
+      armShareButton(btn, byteArray, filename, 'application/pdf', originalText);
     })
     .catch(function(){
       btn.innerHTML = originalText;
@@ -3091,7 +3093,7 @@ function downloadStatsAwardXlsx(btn){
         return;
       }
       var byteArray = byteArrayFromBase64(data.xlsxBase64);
-      armShareButton(btn, byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      armShareButton(btn, byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', originalText);
     })
     .catch(function(err){
       btn.textContent = originalText;
@@ -3450,7 +3452,7 @@ function downloadStatsFile(action, unitName, field, mime, btn){
 
       var byteArray = byteArrayFromBase64(data[field]);
       var filename = data.filename || 'Звіт';
-      armShareButton(btn, byteArray, filename, mime);
+      armShareButton(btn, byteArray, filename, mime, originalText);
     })
     .catch(function(err){
       btn.textContent = originalText;
