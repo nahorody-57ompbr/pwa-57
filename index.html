@@ -1774,6 +1774,26 @@ function downloadBlobFallback(byteArray, filename, mime){
   setTimeout(function(){ URL.revokeObjectURL(link.href); }, 5000);
 }
 
+// Відкриває системне вікно "Поділитися" (усі месенджери, пошта тощо, що є
+// на телефоні) — так само, як поділитися фото чи файлом з будь-якого іншого
+// застосунку. Якщо браузер це не підтримує (напр. десктоп), просто
+// завантажує файл як і раніше.
+function shareOrDownloadBlob(byteArray, filename, mime){
+  try {
+    var file = new File([byteArray], filename, { type: mime });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] }).catch(function(err){
+        // AbortError — користувач сам закрив вікно "Поділитися", це нормально
+        if (err && err.name !== 'AbortError') {
+          downloadBlobFallback(byteArray, filename, mime);
+        }
+      });
+      return;
+    }
+  } catch (e) {}
+  downloadBlobFallback(byteArray, filename, mime);
+}
+
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
 // Список показує все, що є за останні 30 днів (обмеження на бекенді,
 // NOTIF_MAX_AGE_DAYS) — прочитане не зникає одразу, а лишається видимим до
@@ -2481,8 +2501,8 @@ function downloadAwardCard(idx){
 
       var byteArray = byteArrayFromBase64(data.pdfBase64);
       var filename = data.filename || 'Нагородна_картка.pdf';
-      downloadBlobFallback(byteArray, filename, 'application/pdf');
-      btn.innerHTML = '✓ Завантажено';
+      shareOrDownloadBlob(byteArray, filename, 'application/pdf');
+      btn.innerHTML = '✓ Готово';
       setTimeout(function(){
         btn.innerHTML = originalText;
         btn.disabled = false;
@@ -3058,8 +3078,8 @@ function downloadStatsAwardXlsx(btn){
         return;
       }
       var byteArray = byteArrayFromBase64(data.xlsxBase64);
-      downloadBlobFallback(byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      btn.textContent = '✓ Завантажено';
+      shareOrDownloadBlob(byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      btn.textContent = '✓ Готово';
       setTimeout(function(){
         btn.textContent = originalText;
         btn.disabled = false;
@@ -3422,8 +3442,8 @@ function downloadStatsFile(action, unitName, field, mime, btn){
 
       var byteArray = byteArrayFromBase64(data[field]);
       var filename = data.filename || 'Звіт';
-      downloadBlobFallback(byteArray, filename, mime);
-      btn.textContent = '✓ Завантажено';
+      shareOrDownloadBlob(byteArray, filename, mime);
+      btn.textContent = '✓ Готово';
       setTimeout(function(){
         btn.textContent = originalText;
         btn.disabled = false;
