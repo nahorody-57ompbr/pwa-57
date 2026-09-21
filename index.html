@@ -1805,13 +1805,33 @@ function shareOrDownloadBlob(byteArray, filename, mime){
 function armShareButton(btn, byteArray, filename, mime, originalLabel){
   var originalOnclick = btn.onclick;
 
-  btn.disabled = false;
-  btn.innerHTML = '📤 Поділитися / Завантажити';
-  btn.onclick = function(){
-    shareOrDownloadBlob(byteArray, filename, mime);
-    btn.onclick = originalOnclick;
+  var shareBtn = document.createElement('button');
+  shareBtn.type = 'button';
+  shareBtn.className = btn.className;
+  shareBtn.style.cssText = btn.style.cssText;
+  if (!/margin-top/.test(shareBtn.style.cssText)) shareBtn.style.marginTop = '8px';
+  shareBtn.innerHTML = '📤 Поділитися';
+
+  function restore(){
+    btn.disabled = false;
     btn.innerHTML = originalLabel;
+    btn.onclick = originalOnclick;
+    if (shareBtn.parentNode) shareBtn.parentNode.removeChild(shareBtn);
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '⬇️ Завантажити';
+  btn.onclick = function(){
+    downloadBlobFallback(byteArray, filename, mime);
+    restore();
   };
+
+  shareBtn.onclick = function(){
+    shareOrDownloadBlob(byteArray, filename, mime);
+    restore();
+  };
+
+  btn.insertAdjacentElement('afterend', shareBtn);
 }
 
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
