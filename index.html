@@ -1811,58 +1811,53 @@ var SHARE_ICON_SHARE = '<svg viewBox="0 0 24 24" width="15" height="15" fill="no
 // завантаження даних з'являється окрема кнопка "Поділитися" — і вже САМЕ ЦЕЙ,
 // другий дотик (без жодного fetch між ним і share()) відкриває вікно.
 //
-// Якщо передано siblingBtn (сусідня кнопка PDF/XLSX в тому самому рядку) —
-// вона тимчасово перетворюється на "Поділитися" замість вставки нової
-// кнопки, щоб не ламати верстку рядка з двома кнопками. Якщо сусідньої
-// кнопки немає (наприклад, картка нагороди) — нова кнопка додається знизу.
-function armShareButton(btn, byteArray, filename, mime, originalLabel, siblingBtn){
-  var originalOnclick = btn.onclick;
-  var shareBtn = null;
-  var siblingOriginalLabel = null;
-  var siblingOriginalOnclick = null;
+// downloadBtn/downloadLabel і shareBtn/shareLabel передаються явно (а не
+// вгадуються за тим, яку кнопку клікнули) — щоб позиція "Завантажити" й
+// "Поділитися" була завжди стабільною, незалежно від того, PDF чи XLSX
+// генерували. Якщо shareBtn немає (кнопка одна, без пари) — нова кнопка
+// додається знизу.
+function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteArray, filename, mime){
+  var downloadOriginalOnclick = downloadBtn.onclick;
+  var shareOriginalOnclick = shareBtn ? shareBtn.onclick : null;
+  var createdShareBtn = null;
+
+  if (!shareBtn) {
+    createdShareBtn = document.createElement('button');
+    createdShareBtn.type = 'button';
+    createdShareBtn.className = downloadBtn.className;
+    createdShareBtn.style.cssText = downloadBtn.style.cssText;
+    if (!/margin-top/.test(createdShareBtn.style.cssText)) createdShareBtn.style.marginTop = '8px';
+    shareBtn = createdShareBtn;
+  }
 
   function restore(){
-    btn.disabled = false;
-    btn.innerHTML = originalLabel;
-    btn.onclick = originalOnclick;
-    if (siblingBtn) {
-      siblingBtn.disabled = false;
-      siblingBtn.innerHTML = siblingOriginalLabel;
-      siblingBtn.onclick = siblingOriginalOnclick;
-    } else if (shareBtn && shareBtn.parentNode) {
-      shareBtn.parentNode.removeChild(shareBtn);
+    downloadBtn.disabled = false;
+    downloadBtn.innerHTML = downloadLabel;
+    downloadBtn.onclick = downloadOriginalOnclick;
+    if (createdShareBtn) {
+      if (createdShareBtn.parentNode) createdShareBtn.parentNode.removeChild(createdShareBtn);
+    } else {
+      shareBtn.disabled = false;
+      shareBtn.innerHTML = shareLabel;
+      shareBtn.onclick = shareOriginalOnclick;
     }
   }
 
-  btn.disabled = false;
-  btn.innerHTML = SHARE_ICON_DOWNLOAD + 'Завантажити';
-  btn.onclick = function(){
+  downloadBtn.disabled = false;
+  downloadBtn.innerHTML = SHARE_ICON_DOWNLOAD + 'Завантажити';
+  downloadBtn.onclick = function(){
     downloadBlobFallback(byteArray, filename, mime);
     restore();
   };
 
-  if (siblingBtn) {
-    siblingOriginalLabel = siblingBtn.innerHTML;
-    siblingOriginalOnclick = siblingBtn.onclick;
-    siblingBtn.disabled = false;
-    siblingBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
-    siblingBtn.onclick = function(){
-      shareOrDownloadBlob(byteArray, filename, mime);
-      restore();
-    };
-  } else {
-    shareBtn = document.createElement('button');
-    shareBtn.type = 'button';
-    shareBtn.className = btn.className;
-    shareBtn.style.cssText = btn.style.cssText;
-    if (!/margin-top/.test(shareBtn.style.cssText)) shareBtn.style.marginTop = '8px';
-    shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
-    shareBtn.onclick = function(){
-      shareOrDownloadBlob(byteArray, filename, mime);
-      restore();
-    };
-    btn.insertAdjacentElement('afterend', shareBtn);
-  }
+  shareBtn.disabled = false;
+  shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
+  shareBtn.onclick = function(){
+    shareOrDownloadBlob(byteArray, filename, mime);
+    restore();
+  };
+
+  if (createdShareBtn) downloadBtn.insertAdjacentElement('afterend', createdShareBtn);
 }
 
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
@@ -2572,7 +2567,7 @@ function downloadAwardCard(idx){
 
       var byteArray = byteArrayFromBase64(data.pdfBase64);
       var filename = data.filename || 'Нагородна_картка.pdf';
-      armShareButton(btn, byteArray, filename, 'application/pdf', originalText);
+      armShareButton(btn, originalText, null, null, byteArray, filename, 'application/pdf');
     })
     .catch(function(){
       btn.innerHTML = originalText;
@@ -3144,7 +3139,7 @@ function downloadStatsAwardXlsx(btn){
         return;
       }
       var byteArray = byteArrayFromBase64(data.xlsxBase64);
-      armShareButton(btn, byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', originalText);
+      armShareButton(btn, originalText, null, null, byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     })
     .catch(function(err){
       btn.textContent = originalText;
@@ -3503,6 +3498,10 @@ function downloadStatsFile(action, unitName, field, mime, btn){
 
       var byteArray = byteArrayFromBase64(data[field]);
       var filename = data.filename || 'Звіт';
+
+      // Позиція "Завантажити"/"Поділитися" має бути стабільною (перша
+      // кнопка в рядку — завжди Завантажити, друга — завжди Поділитися),
+      // незалежно від того, PDF чи XLSX зараз формували.
       var siblingBtn = null;
       if (btn.parentElement) {
         var rowButtons = btn.parentElement.querySelectorAll('button');
@@ -3510,7 +3509,23 @@ function downloadStatsFile(action, unitName, field, mime, btn){
           if (rowButtons[rb] !== btn) { siblingBtn = rowButtons[rb]; break; }
         }
       }
-      armShareButton(btn, byteArray, filename, mime, originalText, siblingBtn);
+
+      var downloadBtn, downloadLabel, shareBtnArg, shareLabelArg;
+      if (siblingBtn && btn.parentElement) {
+        var allButtons = btn.parentElement.querySelectorAll('button');
+        if (allButtons[0] === btn) {
+          downloadBtn = btn; downloadLabel = originalText;
+          shareBtnArg = siblingBtn; shareLabelArg = siblingBtn.innerHTML;
+        } else {
+          downloadBtn = siblingBtn; downloadLabel = siblingBtn.innerHTML;
+          shareBtnArg = btn; shareLabelArg = originalText;
+        }
+      } else {
+        downloadBtn = btn; downloadLabel = originalText;
+        shareBtnArg = null; shareLabelArg = null;
+      }
+
+      armShareButton(downloadBtn, downloadLabel, shareBtnArg, shareLabelArg, byteArray, filename, mime);
     })
     .catch(function(err){
       btn.textContent = originalText;
