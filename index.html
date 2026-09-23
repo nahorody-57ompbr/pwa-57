@@ -1785,6 +1785,29 @@ function shareOrDownloadBlob(byteArray, filename, mime){
       navigator.share({ files: [file] }).catch(function(err){
         // AbortError — користувач сам закрив вікно "Поділитися", це нормально
         if (err && err.name !== 'AbortError') {
+          shareAsZipOrDownload(byteArray, filename, mime);
+        }
+      });
+      return;
+    }
+  } catch (e) {}
+  shareAsZipOrDownload(byteArray, filename, mime);
+}
+
+// Якщо поділитися самим файлом не вдалось (Chrome не підтримує цей тип на
+// цьому пристрої — типово для .xlsx) — пробуємо запакувати його в ZIP і
+// поділитися архівом (ZIP підтримується Chrome завжди). Перевірка робиться
+// одразу зі справжніми байтами архіву, а не заздалегідь із порожнім
+// файлом — такі попередні перевірки виявились ненадійними на деяких
+// пристроях і мовчки блокували навіть типи, які насправді підтримуються.
+function shareAsZipOrDownload(byteArray, filename, mime){
+  try {
+    var zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
+    var zipBytes = buildZip(filename, byteArray);
+    var zipFile = new File([zipBytes], zipName, { type: 'application/zip' });
+    if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
+      navigator.share({ files: [zipFile] }).catch(function(err){
+        if (err && err.name !== 'AbortError') {
           downloadBlobFallback(byteArray, filename, mime);
         }
       });
@@ -1816,21 +1839,6 @@ var SHARE_ICON_SHARE = '<svg viewBox="0 0 24 24" width="15" height="15" fill="no
 // "Поділитися" була завжди стабільною, незалежно від того, PDF чи XLSX
 // генерували. Якщо shareBtn немає (кнопка одна, без пари) — нова кнопка
 // додається знизу.
-// Перевіряє ЗАЗДАЛЕГІДЬ (без реального файлу — порожній File тієї ж
-// назви/типу достатній), чи цей пристрій/браузер взагалі вміє ділитися саме
-// таким типом файлу. Якщо ні — кнопку "Поділитися" краще не показувати
-// зовсім, ніж показати те, що виглядатиме зламаним (мовчки завантажить
-// замість відкриття меню). PDF підтримується завжди, XLSX — лише на деяких
-// пристроях/версіях Chrome.
-function canShareFile(filename, mime){
-  try {
-    if (!navigator.canShare) return false;
-    return navigator.canShare({ files: [new File([], filename, { type: mime })] });
-  } catch (e) {
-    return false;
-  }
-}
-
 // ==================== Мінімальний ZIP-архіватор (без стиснення) ====================
 // Chrome дозволяє "Поділитися" файлами лише обмеженого списку типів — .zip
 // у ньому є завжди, на відміну від .xlsx на частині пристроїв. Тому, коли
@@ -1931,15 +1939,15 @@ function buildZip(entryName, bytes){
   return out;
 }
 
+// Кнопка "Поділитися" показується завжди (без ненадійних попередніх
+// перевірок) — сама спроба share() всередині shareOrDownloadBlob вже
+// пробує спочатку оригінальний файл, потім ZIP, і лише тоді тихо завантажує.
 function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteArray, filename, mime){
   var downloadOriginalOnclick = downloadBtn.onclick;
-  var supportsShareNative = canShareFile(filename, mime);
-  var supportsShareViaZip = !supportsShareNative && canShareFile('a.zip', 'application/zip');
-  var supportsShare = supportsShareNative || supportsShareViaZip;
-  var shareOriginalOnclick = (shareBtn && supportsShare) ? shareBtn.onclick : null;
+  var shareOriginalOnclick = shareBtn ? shareBtn.onclick : null;
   var createdShareBtn = null;
 
-  if (supportsShare && !shareBtn) {
+  if (!shareBtn) {
     createdShareBtn = document.createElement('button');
     createdShareBtn.type = 'button';
     createdShareBtn.className = downloadBtn.className;
@@ -1952,14 +1960,12 @@ function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteAr
     downloadBtn.disabled = false;
     downloadBtn.innerHTML = downloadLabel;
     downloadBtn.onclick = downloadOriginalOnclick;
-    if (supportsShare) {
-      if (createdShareBtn) {
-        if (createdShareBtn.parentNode) createdShareBtn.parentNode.removeChild(createdShareBtn);
-      } else if (shareBtn) {
-        shareBtn.disabled = false;
-        shareBtn.innerHTML = shareLabel;
-        shareBtn.onclick = shareOriginalOnclick;
-      }
+    if (createdShareBtn) {
+      if (createdShareBtn.parentNode) createdShareBtn.parentNode.removeChild(createdShareBtn);
+    } else {
+      shareBtn.disabled = false;
+      shareBtn.innerHTML = shareLabel;
+      shareBtn.onclick = shareOriginalOnclick;
     }
   }
 
@@ -1970,21 +1976,14 @@ function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteAr
     restore();
   };
 
-  if (supportsShare && shareBtn) {
-    shareBtn.disabled = false;
-    shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
-    shareBtn.onclick = function(){
-      if (supportsShareNative) {
-        shareOrDownloadBlob(byteArray, filename, mime);
-      } else {
-        var zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
-        var zipBytes = buildZip(filename, byteArray);
-        shareOrDownloadBlob(zipBytes, zipName, 'application/zip');
-      }
-      restore();
-    };
-    if (createdShareBtn) downloadBtn.insertAdjacentElement('afterend', createdShareBtn);
-  }
+  shareBtn.disabled = false;
+  shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
+  shareBtn.onclick = function(){
+    shareOrDownloadBlob(byteArray, filename, mime);
+    restore();
+  };
+
+  if (createdShareBtn) downloadBtn.insertAdjacentElement('afterend', createdShareBtn);
 }
 
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
@@ -3640,7 +3639,7 @@ function downloadStatsFile(action, unitName, field, mime, btn){
       }
 
       var downloadBtn, downloadLabel, shareBtnArg, shareLabelArg;
-      if (siblingBtn && btn.parentElement && (canShareFile(filename, mime) || canShareFile('a.zip', 'application/zip'))) {
+      if (siblingBtn && btn.parentElement) {
         var allButtons = btn.parentElement.querySelectorAll('button');
         if (allButtons[0] === btn) {
           downloadBtn = btn; downloadLabel = originalText;
