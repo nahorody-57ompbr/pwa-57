@@ -1942,12 +1942,35 @@ function buildZip(entryName, bytes){
 // Кнопка "Поділитися" показується завжди (без ненадійних попередніх
 // перевірок) — сама спроба share() всередині shareOrDownloadBlob вже
 // пробує спочатку оригінальний файл, потім ZIP, і лише тоді тихо завантажує.
+// Перевіряє РЕАЛЬНИМИ байтами файлу (не порожнім — це виявилось ненадійним
+// і мовчки блокувало навіть підтримувані типи), чи можна на цьому пристрої
+// поділитися оригіналом або хоча б ZIP-архівом з ним. canShare() не
+// потребує "свіжого" дотику, тож перевірку безпечно робити одразу після
+// генерації файлу, а не лише в момент кліку.
+function canShareBytes(byteArray, filename, mime){
+  try {
+    var nativeFile = new File([byteArray], filename, { type: mime });
+    if (navigator.canShare && navigator.canShare({ files: [nativeFile] })) return true;
+  } catch (e) {}
+  try {
+    var zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
+    var zipBytes = buildZip(filename, byteArray);
+    var zipFile = new File([zipBytes], zipName, { type: 'application/zip' });
+    if (navigator.canShare && navigator.canShare({ files: [zipFile] })) return true;
+  } catch (e) {}
+  return false;
+}
+
+// Кнопка "Поділитися" з'являється лише тоді, коли canShareBytes() підтвердив,
+// що це реально спрацює на цьому пристрої — щоб не показувати те, що
+// виглядатиме зламаним.
 function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteArray, filename, mime){
   var downloadOriginalOnclick = downloadBtn.onclick;
-  var shareOriginalOnclick = shareBtn ? shareBtn.onclick : null;
+  var supportsShare = canShareBytes(byteArray, filename, mime);
+  var shareOriginalOnclick = (shareBtn && supportsShare) ? shareBtn.onclick : null;
   var createdShareBtn = null;
 
-  if (!shareBtn) {
+  if (supportsShare && !shareBtn) {
     createdShareBtn = document.createElement('button');
     createdShareBtn.type = 'button';
     createdShareBtn.className = downloadBtn.className;
@@ -1960,12 +1983,14 @@ function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteAr
     downloadBtn.disabled = false;
     downloadBtn.innerHTML = downloadLabel;
     downloadBtn.onclick = downloadOriginalOnclick;
-    if (createdShareBtn) {
-      if (createdShareBtn.parentNode) createdShareBtn.parentNode.removeChild(createdShareBtn);
-    } else {
-      shareBtn.disabled = false;
-      shareBtn.innerHTML = shareLabel;
-      shareBtn.onclick = shareOriginalOnclick;
+    if (supportsShare) {
+      if (createdShareBtn) {
+        if (createdShareBtn.parentNode) createdShareBtn.parentNode.removeChild(createdShareBtn);
+      } else if (shareBtn) {
+        shareBtn.disabled = false;
+        shareBtn.innerHTML = shareLabel;
+        shareBtn.onclick = shareOriginalOnclick;
+      }
     }
   }
 
@@ -1976,14 +2001,15 @@ function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteAr
     restore();
   };
 
-  shareBtn.disabled = false;
-  shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
-  shareBtn.onclick = function(){
-    shareOrDownloadBlob(byteArray, filename, mime);
-    restore();
-  };
-
-  if (createdShareBtn) downloadBtn.insertAdjacentElement('afterend', createdShareBtn);
+  if (supportsShare && shareBtn) {
+    shareBtn.disabled = false;
+    shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
+    shareBtn.onclick = function(){
+      shareOrDownloadBlob(byteArray, filename, mime);
+      restore();
+    };
+    if (createdShareBtn) downloadBtn.insertAdjacentElement('afterend', createdShareBtn);
+  }
 }
 
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
@@ -3639,7 +3665,7 @@ function downloadStatsFile(action, unitName, field, mime, btn){
       }
 
       var downloadBtn, downloadLabel, shareBtnArg, shareLabelArg;
-      if (siblingBtn && btn.parentElement) {
+      if (siblingBtn && btn.parentElement && canShareBytes(byteArray, filename, mime)) {
         var allButtons = btn.parentElement.querySelectorAll('button');
         if (allButtons[0] === btn) {
           downloadBtn = btn; downloadLabel = originalText;
