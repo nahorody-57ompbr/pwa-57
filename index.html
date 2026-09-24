@@ -1774,243 +1774,6 @@ function downloadBlobFallback(byteArray, filename, mime){
   setTimeout(function(){ URL.revokeObjectURL(link.href); }, 5000);
 }
 
-// Відкриває системне вікно "Поділитися" (усі месенджери, пошта тощо, що є
-// на телефоні) — так само, як поділитися фото чи файлом з будь-якого іншого
-// застосунку. Якщо браузер це не підтримує (напр. десктоп), просто
-// завантажує файл як і раніше.
-function shareOrDownloadBlob(byteArray, filename, mime){
-  try {
-    var file = new File([byteArray], filename, { type: mime });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      navigator.share({ files: [file] }).catch(function(err){
-        // AbortError — користувач сам закрив вікно "Поділитися", це нормально
-        if (err && err.name !== 'AbortError') {
-          shareAsZipOrDownload(byteArray, filename, mime);
-        }
-      });
-      return;
-    }
-  } catch (e) {}
-  shareAsZipOrDownload(byteArray, filename, mime);
-}
-
-// Якщо поділитися самим файлом не вдалось (Chrome не підтримує цей тип на
-// цьому пристрої — типово для .xlsx) — пробуємо запакувати його в ZIP і
-// поділитися архівом (ZIP підтримується Chrome завжди). Перевірка робиться
-// одразу зі справжніми байтами архіву, а не заздалегідь із порожнім
-// файлом — такі попередні перевірки виявились ненадійними на деяких
-// пристроях і мовчки блокували навіть типи, які насправді підтримуються.
-function shareAsZipOrDownload(byteArray, filename, mime){
-  try {
-    var zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
-    var zipBytes = buildZip(filename, byteArray);
-    var zipFile = new File([zipBytes], zipName, { type: 'application/zip' });
-    if (navigator.canShare && navigator.canShare({ files: [zipFile] })) {
-      navigator.share({ files: [zipFile] }).catch(function(err){
-        if (err && err.name !== 'AbortError') {
-          downloadBlobFallback(byteArray, filename, mime);
-        }
-      });
-      return;
-    }
-  } catch (e) {}
-  downloadBlobFallback(byteArray, filename, mime);
-}
-
-// navigator.share() вимагає "свіжого" дотику (transient activation) — після
-// fetch(), який часто триває довше кількох секунд, браузер вважає дотик
-// застарілим і мовчки відмовляє. Тому замість виклику share() одразу після
-// завантаження даних кнопка перетворюється на "Поділитися" — і вже САМЕ ЦЕЙ,
-// другий дотик (без жодного fetch між ним і share()) відкриває вікно.
-// originalLabel передається явно (а не зчитується з кнопки в цей момент),
-// бо на момент виклику кнопка вже показує "Формую..." — інакше саме цей
-// текст і лишився б назавжди після повторного натискання.
-var SHARE_ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;"><path d="M12 3v10m0 0l-3.5-3.5M12 13l3.5-3.5"/><path d="M5 17v2a2 2 0 002 2h10a2 2 0 002-2v-2"/></svg>';
-var SHARE_ICON_SHARE = '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-3px;margin-right:6px;"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.7l7.6-4.4M8.2 13.3l7.6 4.4"/></svg>';
-
-// navigator.share() вимагає "свіжого" дотику (transient activation) — після
-// fetch(), який часто триває довше кількох секунд, браузер вважає дотик
-// застарілим і мовчки відмовляє. Тому замість виклику share() одразу після
-// завантаження даних з'являється окрема кнопка "Поділитися" — і вже САМЕ ЦЕЙ,
-// другий дотик (без жодного fetch між ним і share()) відкриває вікно.
-//
-// downloadBtn/downloadLabel і shareBtn/shareLabel передаються явно (а не
-// вгадуються за тим, яку кнопку клікнули) — щоб позиція "Завантажити" й
-// "Поділитися" була завжди стабільною, незалежно від того, PDF чи XLSX
-// генерували. Якщо shareBtn немає (кнопка одна, без пари) — нова кнопка
-// додається знизу.
-// ==================== Мінімальний ZIP-архіватор (без стиснення) ====================
-// Chrome дозволяє "Поділитися" файлами лише обмеженого списку типів — .zip
-// у ньому є завжди, на відміну від .xlsx на частині пристроїв. Тому, коли
-// поділитися самим .xlsx неможливо, застосунок пакує його в справжній,
-// стандартний ZIP-архів (метод "stored", без стиснення — тут це не потрібно,
-// файли й так невеликі) прямо перед відправкою. Будь-який телефон
-// розархівує такий файл одним дотиком у "Файлах".
-var CRC32_TABLE = (function(){
-  var table = [];
-  for (var n = 0; n < 256; n++){
-    var c = n;
-    for (var k = 0; k < 8; k++){
-      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-    }
-    table[n] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(bytes){
-  var crc = 0xFFFFFFFF;
-  for (var i = 0; i < bytes.length; i++){
-    crc = CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
-  }
-  return (crc ^ 0xFFFFFFFF) >>> 0;
-}
-
-function zipWriteU32(arr, offset, value){
-  arr[offset] = value & 0xFF;
-  arr[offset + 1] = (value >>> 8) & 0xFF;
-  arr[offset + 2] = (value >>> 16) & 0xFF;
-  arr[offset + 3] = (value >>> 24) & 0xFF;
-}
-function zipWriteU16(arr, offset, value){
-  arr[offset] = value & 0xFF;
-  arr[offset + 1] = (value >>> 8) & 0xFF;
-}
-
-function buildZip(entryName, bytes){
-  var nameBytes = new TextEncoder().encode(entryName);
-  var nameLen = nameBytes.length;
-  var crc = crc32(bytes);
-  var size = bytes.length;
-  var UTF8_FLAG = 0x0800; // ім'я файлу в UTF-8 (щоб кириличні назви відображались коректно)
-
-  var localLen = 30 + nameLen;
-  var local = new Uint8Array(localLen);
-  zipWriteU32(local, 0, 0x04034b50);
-  zipWriteU16(local, 4, 20);
-  zipWriteU16(local, 6, UTF8_FLAG);
-  zipWriteU16(local, 8, 0);
-  zipWriteU16(local, 10, 0);
-  zipWriteU16(local, 12, 0x21);
-  zipWriteU32(local, 14, crc);
-  zipWriteU32(local, 18, size);
-  zipWriteU32(local, 22, size);
-  zipWriteU16(local, 26, nameLen);
-  zipWriteU16(local, 28, 0);
-  local.set(nameBytes, 30);
-
-  var centralLen = 46 + nameLen;
-  var central = new Uint8Array(centralLen);
-  zipWriteU32(central, 0, 0x02014b50);
-  zipWriteU16(central, 4, 20);
-  zipWriteU16(central, 6, 20);
-  zipWriteU16(central, 8, UTF8_FLAG);
-  zipWriteU16(central, 10, 0);
-  zipWriteU16(central, 12, 0);
-  zipWriteU16(central, 14, 0x21);
-  zipWriteU32(central, 16, crc);
-  zipWriteU32(central, 20, size);
-  zipWriteU32(central, 24, size);
-  zipWriteU16(central, 28, nameLen);
-  zipWriteU16(central, 30, 0);
-  zipWriteU16(central, 32, 0);
-  zipWriteU16(central, 34, 0);
-  zipWriteU16(central, 36, 0);
-  zipWriteU32(central, 38, 0);
-  zipWriteU32(central, 42, 0);
-  central.set(nameBytes, 46);
-
-  var eocd = new Uint8Array(22);
-  zipWriteU32(eocd, 0, 0x06054b50);
-  zipWriteU16(eocd, 4, 0);
-  zipWriteU16(eocd, 6, 0);
-  zipWriteU16(eocd, 8, 1);
-  zipWriteU16(eocd, 10, 1);
-  zipWriteU32(eocd, 12, centralLen);
-  zipWriteU32(eocd, 16, localLen + size);
-  zipWriteU16(eocd, 20, 0);
-
-  var out = new Uint8Array(localLen + size + centralLen + eocd.length);
-  var pos = 0;
-  out.set(local, pos); pos += localLen;
-  out.set(bytes, pos); pos += size;
-  out.set(central, pos); pos += centralLen;
-  out.set(eocd, pos);
-  return out;
-}
-
-// Кнопка "Поділитися" показується завжди (без ненадійних попередніх
-// перевірок) — сама спроба share() всередині shareOrDownloadBlob вже
-// пробує спочатку оригінальний файл, потім ZIP, і лише тоді тихо завантажує.
-// Перевіряє РЕАЛЬНИМИ байтами файлу (не порожнім — це виявилось ненадійним
-// і мовчки блокувало навіть підтримувані типи), чи можна на цьому пристрої
-// поділитися оригіналом або хоча б ZIP-архівом з ним. canShare() не
-// потребує "свіжого" дотику, тож перевірку безпечно робити одразу після
-// генерації файлу, а не лише в момент кліку.
-function canShareBytes(byteArray, filename, mime){
-  try {
-    var nativeFile = new File([byteArray], filename, { type: mime });
-    if (navigator.canShare && navigator.canShare({ files: [nativeFile] })) return true;
-  } catch (e) {}
-  try {
-    var zipName = filename.replace(/\.[^.]+$/, '') + '.zip';
-    var zipBytes = buildZip(filename, byteArray);
-    var zipFile = new File([zipBytes], zipName, { type: 'application/zip' });
-    if (navigator.canShare && navigator.canShare({ files: [zipFile] })) return true;
-  } catch (e) {}
-  return false;
-}
-
-// Кнопка "Поділитися" з'являється лише тоді, коли canShareBytes() підтвердив,
-// що це реально спрацює на цьому пристрої — щоб не показувати те, що
-// виглядатиме зламаним.
-function armShareButton(downloadBtn, downloadLabel, shareBtn, shareLabel, byteArray, filename, mime){
-  var downloadOriginalOnclick = downloadBtn.onclick;
-  var supportsShare = canShareBytes(byteArray, filename, mime);
-  var shareOriginalOnclick = (shareBtn && supportsShare) ? shareBtn.onclick : null;
-  var createdShareBtn = null;
-
-  if (supportsShare && !shareBtn) {
-    createdShareBtn = document.createElement('button');
-    createdShareBtn.type = 'button';
-    createdShareBtn.className = downloadBtn.className;
-    createdShareBtn.style.cssText = downloadBtn.style.cssText;
-    if (!/margin-top/.test(createdShareBtn.style.cssText)) createdShareBtn.style.marginTop = '8px';
-    shareBtn = createdShareBtn;
-  }
-
-  function restore(){
-    downloadBtn.disabled = false;
-    downloadBtn.innerHTML = downloadLabel;
-    downloadBtn.onclick = downloadOriginalOnclick;
-    if (supportsShare) {
-      if (createdShareBtn) {
-        if (createdShareBtn.parentNode) createdShareBtn.parentNode.removeChild(createdShareBtn);
-      } else if (shareBtn) {
-        shareBtn.disabled = false;
-        shareBtn.innerHTML = shareLabel;
-        shareBtn.onclick = shareOriginalOnclick;
-      }
-    }
-  }
-
-  downloadBtn.disabled = false;
-  downloadBtn.innerHTML = SHARE_ICON_DOWNLOAD + 'Завантажити';
-  downloadBtn.onclick = function(){
-    downloadBlobFallback(byteArray, filename, mime);
-    restore();
-  };
-
-  if (supportsShare && shareBtn) {
-    shareBtn.disabled = false;
-    shareBtn.innerHTML = SHARE_ICON_SHARE + 'Поділитися';
-    shareBtn.onclick = function(){
-      shareOrDownloadBlob(byteArray, filename, mime);
-      restore();
-    };
-    if (createdShareBtn) downloadBtn.insertAdjacentElement('afterend', createdShareBtn);
-  }
-}
 
 // ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
 // Список показує все, що є за останні 30 днів (обмеження на бекенді,
@@ -2719,7 +2482,12 @@ function downloadAwardCard(idx){
 
       var byteArray = byteArrayFromBase64(data.pdfBase64);
       var filename = data.filename || 'Нагородна_картка.pdf';
-      armShareButton(btn, originalText, null, null, byteArray, filename, 'application/pdf');
+      downloadBlobFallback(byteArray, filename, 'application/pdf');
+      btn.innerHTML = '✓ Завантажено';
+      setTimeout(function(){
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      }, 1500);
     })
     .catch(function(){
       btn.innerHTML = originalText;
@@ -3291,7 +3059,12 @@ function downloadStatsAwardXlsx(btn){
         return;
       }
       var byteArray = byteArrayFromBase64(data.xlsxBase64);
-      armShareButton(btn, originalText, null, null, byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      downloadBlobFallback(byteArray, data.filename || 'Список.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+      btn.textContent = '✓ Завантажено';
+      setTimeout(function(){
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }, 1500);
     })
     .catch(function(err){
       btn.textContent = originalText;
@@ -3650,36 +3423,12 @@ function downloadStatsFile(action, unitName, field, mime, btn){
 
       var byteArray = byteArrayFromBase64(data[field]);
       var filename = data.filename || 'Звіт';
-
-      // Позиція "Завантажити"/"Поділитися" має бути стабільною (перша
-      // кнопка в рядку — завжди Завантажити, друга — завжди Поділитися) —
-      // але лише якщо "Поділитися" для цього типу файлу тут реально
-      // підтримується. Якщо ні — сусідню кнопку не чіпаємо взагалі,
-      // натиснута кнопка просто стає "Завантажити" на своєму місці.
-      var siblingBtn = null;
-      if (btn.parentElement) {
-        var rowButtons = btn.parentElement.querySelectorAll('button');
-        for (var rb = 0; rb < rowButtons.length; rb++) {
-          if (rowButtons[rb] !== btn) { siblingBtn = rowButtons[rb]; break; }
-        }
-      }
-
-      var downloadBtn, downloadLabel, shareBtnArg, shareLabelArg;
-      if (siblingBtn && btn.parentElement && canShareBytes(byteArray, filename, mime)) {
-        var allButtons = btn.parentElement.querySelectorAll('button');
-        if (allButtons[0] === btn) {
-          downloadBtn = btn; downloadLabel = originalText;
-          shareBtnArg = siblingBtn; shareLabelArg = siblingBtn.innerHTML;
-        } else {
-          downloadBtn = siblingBtn; downloadLabel = siblingBtn.innerHTML;
-          shareBtnArg = btn; shareLabelArg = originalText;
-        }
-      } else {
-        downloadBtn = btn; downloadLabel = originalText;
-        shareBtnArg = null; shareLabelArg = null;
-      }
-
-      armShareButton(downloadBtn, downloadLabel, shareBtnArg, shareLabelArg, byteArray, filename, mime);
+      downloadBlobFallback(byteArray, filename, mime);
+      btn.textContent = '✓ Завантажено';
+      setTimeout(function(){
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }, 1500);
     })
     .catch(function(err){
       btn.textContent = originalText;
