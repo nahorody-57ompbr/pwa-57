@@ -1057,6 +1057,29 @@ nav.bottombar button.active .indicator{
         <div id="admin-notif-result" style="margin-top:10px;"></div>
       </div>
 
+      <div class="card" id="diag-share-card">
+        <p class="card-title">Діагностика "Поділитися" (тимчасово)</p>
+        <p class="body-note" style="margin-bottom:10px;">Кожна кнопка одразу показує результат у вікні. Спершу "Перевірити" (canShare), потім за бажанням "Спробувати" (реальний share()).</p>
+
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">A. Справжній XLSX MIME</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn-outline" style="flex:1;" onclick="diagCanShare('test.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')">Перевірити</button>
+          <button class="btn-outline" style="flex:1;" onclick="diagTryShare('test.xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')">Спробувати</button>
+        </div>
+
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">B. Загальний MIME (octet-stream)</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn-outline" style="flex:1;" onclick="diagCanShare('test.xlsx','application/octet-stream')">Перевірити</button>
+          <button class="btn-outline" style="flex:1;" onclick="diagTryShare('test.xlsx','application/octet-stream')">Спробувати</button>
+        </div>
+
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">C. ZIP-архів</p>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-outline" style="flex:1;" onclick="diagCanShare('test.zip','application/zip')">Перевірити</button>
+          <button class="btn-outline" style="flex:1;" onclick="diagTryShare('test.zip','application/zip')">Спробувати</button>
+        </div>
+      </div>
+
       <div id="admin-body"><div class="search-loading">Завантажую...</div></div>
     </section>
 
@@ -1761,6 +1784,33 @@ function byteArrayFromBase64(base64){
   var byteNumbers = new Array(byteChars.length);
   for (var i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
   return new Uint8Array(byteNumbers);
+}
+
+// ==================== ТИМЧАСОВА ДІАГНОСТИКА "ПОДІЛИТИСЯ" ====================
+// Показує факти прямо на екрані (alert), а не гіпотези: що саме canShare()
+// повертає для різних MIME-типів, і що саме робить share() при спробі.
+// Прибрати разом з карткою в Адмін-панелі, коли зʼясуємо результат.
+function diagCanShare(filename, mime){
+  try {
+    var file = new File([new Uint8Array([1, 2, 3, 4, 5])], filename, { type: mime });
+    var can = navigator.canShare && navigator.canShare({ files: [file] });
+    alert('canShare("' + filename + '", "' + mime + '") = ' + can);
+  } catch (e) {
+    alert('canShare кинув помилку: ' + e.message);
+  }
+}
+
+function diagTryShare(filename, mime){
+  try {
+    var file = new File([new Uint8Array([1, 2, 3, 4, 5])], filename, { type: mime });
+    navigator.share({ files: [file] }).then(function(){
+      alert('share() виконано без помилки (вікно мало відкритись і закритись нормально)');
+    }).catch(function(err){
+      alert('share() відхилив: ' + (err && err.name) + ' — ' + (err && err.message));
+    });
+  } catch (e) {
+    alert('share() кинув синхронну помилку: ' + e.message);
+  }
 }
 
 function downloadBlobFallback(byteArray, filename, mime){
