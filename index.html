@@ -1080,8 +1080,20 @@ nav.bottombar button.active .indicator{
         </div>
 
         <p class="body-note" style="font-weight:700;margin-bottom:4px;">D. Справжній, коректний ZIP</p>
-        <div style="display:flex;gap:8px;">
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
           <button class="btn-outline" style="flex:1;" onclick="diagTryShareRealZip()">Спробувати (реальний ZIP)</button>
+        </div>
+
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">E. Справжній XLSX із сервера (два кроки)</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
+          <button class="btn-outline" style="flex:1;" id="diag-e-fetch" onclick="diagFetchReal('xlsx')">1. Отримати</button>
+          <button class="btn-outline" style="flex:1;" id="diag-e-share" onclick="diagShareReal('xlsx')" disabled>2. Поділитися</button>
+        </div>
+
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">F. Справжній PDF із сервера (два кроки, для порівняння)</p>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-outline" style="flex:1;" id="diag-f-fetch" onclick="diagFetchReal('pdf')">1. Отримати</button>
+          <button class="btn-outline" style="flex:1;" id="diag-f-share" onclick="diagShareReal('pdf')" disabled>2. Поділитися</button>
         </div>
       </div>
 
@@ -1890,6 +1902,64 @@ function diagTryShareRealZip(){
     });
   } catch (e) {
     alert('Помилка при побудові/спробі: ' + e.message);
+  }
+}
+
+// ---- E/F: перевірка на СПРАВЖНЬОМУ файлі з сервера, у два кроки ----
+var diagRealBytes = {};
+
+function diagFetchReal(kind){
+  var btn = document.getElementById('diag-' + (kind === 'xlsx' ? 'e' : 'f') + '-fetch');
+  var shareBtn = document.getElementById('diag-' + (kind === 'xlsx' ? 'e' : 'f') + '-share');
+  var originalText = btn.textContent;
+  btn.textContent = 'Отримую...';
+  btn.disabled = true;
+
+  var url = kind === 'xlsx'
+    ? API_BASE_URL + '?action=statsGeneralXlsx&code=' + encodeURIComponent(getAuthCode()) + '&year=all'
+    : API_BASE_URL + '?action=statsGeneralPdf&code=' + encodeURIComponent(getAuthCode()) + '&year=all';
+  var field = kind === 'xlsx' ? 'xlsxBase64' : 'pdfBase64';
+  var mime = kind === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/pdf';
+
+  fetch(url)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      btn.textContent = originalText;
+      btn.disabled = false;
+      if (!data || !data.ok) {
+        alert('Не вдалося отримати файл: ' + (data && data.error));
+        return;
+      }
+      var byteArray = byteArrayFromBase64(data[field]);
+      diagRealBytes[kind] = { bytes: byteArray, filename: data.filename || ('test.' + kind), mime: mime };
+      alert('Отримано! Розмір: ' + byteArray.length + ' байт. Назва: ' + diagRealBytes[kind].filename + '. Тепер натисни "2. Поділитися" — цей дотик буде повністю окремим, без жодного fetch перед share().');
+      shareBtn.disabled = false;
+    })
+    .catch(function(err){
+      btn.textContent = originalText;
+      btn.disabled = false;
+      alert('Помилка мережі: ' + err);
+    });
+}
+
+function diagShareReal(kind){
+  var data = diagRealBytes[kind];
+  if (!data) { alert('Спершу натисни "1. Отримати"'); return; }
+
+  try {
+    var file = new File([data.bytes], data.filename, { type: data.mime });
+    var canShareResult = navigator.canShare && navigator.canShare({ files: [file] });
+    if (!canShareResult) {
+      alert('canShare() з РЕАЛЬНИМ ' + kind.toUpperCase() + ' (розмір ' + data.bytes.length + ' байт) = false. share() навіть не викликаю.');
+      return;
+    }
+    navigator.share({ files: [file] }).then(function(){
+      alert('✓ share() з РЕАЛЬНИМ ' + kind.toUpperCase() + ' виконано без помилки!');
+    }).catch(function(err){
+      alert('share() з РЕАЛЬНИМ ' + kind.toUpperCase() + ' (canShare=true, розмір ' + data.bytes.length + ' байт) відхилив: ' + (err && err.name) + ' — ' + (err && err.message));
+    });
+  } catch (e) {
+    alert('Синхронна помилка з реальним ' + kind + ': ' + e.message);
   }
 }
 
