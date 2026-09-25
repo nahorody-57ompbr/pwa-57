@@ -1073,10 +1073,15 @@ nav.bottombar button.active .indicator{
           <button class="btn-outline" style="flex:1;" onclick="diagTryShare('test.xlsx','application/octet-stream')">Спробувати</button>
         </div>
 
-        <p class="body-note" style="font-weight:700;margin-bottom:4px;">C. ZIP-архів</p>
-        <div style="display:flex;gap:8px;">
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">C. ZIP-архів (сміттєвий вміст)</p>
+        <div style="display:flex;gap:8px;margin-bottom:12px;">
           <button class="btn-outline" style="flex:1;" onclick="diagCanShare('test.zip','application/zip')">Перевірити</button>
           <button class="btn-outline" style="flex:1;" onclick="diagTryShare('test.zip','application/zip')">Спробувати</button>
+        </div>
+
+        <p class="body-note" style="font-weight:700;margin-bottom:4px;">D. Справжній, коректний ZIP</p>
+        <div style="display:flex;gap:8px;">
+          <button class="btn-outline" style="flex:1;" onclick="diagTryShareRealZip()">Спробувати (реальний ZIP)</button>
         </div>
       </div>
 
@@ -1810,6 +1815,81 @@ function diagTryShare(filename, mime){
     });
   } catch (e) {
     alert('share() кинув синхронну помилку: ' + e.message);
+  }
+}
+
+// Мінімальний ZIP-архіватор (метод "stored", без стиснення) — лише для
+// діагностики D: перевірити, чи справжній, коректний ZIP-файл (не сміттєві
+// байти) share() приймає інакше.
+var DIAG_CRC32_TABLE = (function(){
+  var table = [];
+  for (var n = 0; n < 256; n++){
+    var c = n;
+    for (var k = 0; k < 8; k++){
+      c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    }
+    table[n] = c >>> 0;
+  }
+  return table;
+})();
+
+function diagCrc32(bytes){
+  var crc = 0xFFFFFFFF;
+  for (var i = 0; i < bytes.length; i++){
+    crc = DIAG_CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function diagBuildRealZip(entryName, bytes){
+  function wU32(arr, o, v){ arr[o]=v&0xFF; arr[o+1]=(v>>>8)&0xFF; arr[o+2]=(v>>>16)&0xFF; arr[o+3]=(v>>>24)&0xFF; }
+  function wU16(arr, o, v){ arr[o]=v&0xFF; arr[o+1]=(v>>>8)&0xFF; }
+
+  var nameBytes = new TextEncoder().encode(entryName);
+  var nameLen = nameBytes.length;
+  var crc = diagCrc32(bytes);
+  var size = bytes.length;
+
+  var localLen = 30 + nameLen;
+  var local = new Uint8Array(localLen);
+  wU32(local, 0, 0x04034b50); wU16(local, 4, 20); wU16(local, 6, 0); wU16(local, 8, 0);
+  wU16(local, 10, 0); wU16(local, 12, 0x21); wU32(local, 14, crc);
+  wU32(local, 18, size); wU32(local, 22, size); wU16(local, 26, nameLen); wU16(local, 28, 0);
+  local.set(nameBytes, 30);
+
+  var centralLen = 46 + nameLen;
+  var central = new Uint8Array(centralLen);
+  wU32(central, 0, 0x02014b50); wU16(central, 4, 20); wU16(central, 6, 20); wU16(central, 8, 0);
+  wU16(central, 10, 0); wU16(central, 12, 0); wU16(central, 14, 0x21); wU32(central, 16, crc);
+  wU32(central, 20, size); wU32(central, 24, size); wU16(central, 28, nameLen); wU16(central, 30, 0);
+  wU16(central, 32, 0); wU16(central, 34, 0); wU16(central, 36, 0); wU32(central, 38, 0); wU32(central, 42, 0);
+  central.set(nameBytes, 46);
+
+  var eocd = new Uint8Array(22);
+  wU32(eocd, 0, 0x06054b50); wU16(eocd, 4, 0); wU16(eocd, 6, 0); wU16(eocd, 8, 1); wU16(eocd, 10, 1);
+  wU32(eocd, 12, centralLen); wU32(eocd, 16, localLen + size); wU16(eocd, 20, 0);
+
+  var out = new Uint8Array(localLen + size + centralLen + eocd.length);
+  var pos = 0;
+  out.set(local, pos); pos += localLen;
+  out.set(bytes, pos); pos += size;
+  out.set(central, pos); pos += centralLen;
+  out.set(eocd, pos);
+  return out;
+}
+
+function diagTryShareRealZip(){
+  try {
+    var content = new TextEncoder().encode('Це справжній, коректний текстовий файл усередині ZIP-архіву для перевірки.');
+    var zipBytes = diagBuildRealZip('test.txt', content);
+    var file = new File([zipBytes], 'real_test.zip', { type: 'application/zip' });
+    navigator.share({ files: [file] }).then(function(){
+      alert('share() з реальним ZIP виконано без помилки!');
+    }).catch(function(err){
+      alert('share() з реальним ZIP відхилив: ' + (err && err.name) + ' — ' + (err && err.message));
+    });
+  } catch (e) {
+    alert('Помилка при побудові/спробі: ' + e.message);
   }
 }
 
