@@ -1232,6 +1232,7 @@ function refreshAuthInBackground(code){
 
 function forceLogout(message){
   localStorage.removeItem(AUTH_STORAGE_KEY);
+  syncNativeAuth();
   document.getElementById('lock-gate').classList.remove('show');
   document.getElementById('forced-pin-gate').classList.remove('show');
   document.getElementById('app').style.display = 'none';
@@ -1807,7 +1808,23 @@ function refreshNotifDot(items){
   if (dot) dot.style.display = hasUnread ? 'block' : 'none';
 }
 
+// Android-оболонка: передаємо їй код доступу (або повідомляємо про вихід), щоб
+// вона могла у фоні перевіряти нові сповіщення. У звичайному браузері (PWA)
+// об'єкта NahorodyAndroid немає — функція нічого не робить.
+function syncNativeAuth(){
+  try {
+    if (!window.NahorodyAndroid) return;
+    var code = getAuthCode();
+    if (code) {
+      if (NahorodyAndroid.setAuthCode) NahorodyAndroid.setAuthCode(code);
+    } else if (NahorodyAndroid.clearAuthCode) {
+      NahorodyAndroid.clearAuthCode();
+    }
+  } catch(e){ /* не заважаємо основній роботі застосунку */ }
+}
+
 function loadDigest(){
+  syncNativeAuth();
   var url = API_BASE_URL + '?action=notifications&code=' + encodeURIComponent(getAuthCode());
   fetch(url)
     .then(function(res){ return res.json(); })
