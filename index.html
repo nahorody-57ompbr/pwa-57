@@ -342,9 +342,15 @@ main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px calc(90px + var(-
 .stats-rank-sub{font-size:11px;color:var(--text-secondary);margin:1px 0 0;}
 .stats-rank-count{flex-shrink:0;font-size:14px;font-weight:700;color:var(--zoloto);}
 .stats-select{
-  width:100%;height:46px;background:var(--surface-2);border:1px solid var(--border);
+  width:100%;height:46px;background-color:var(--surface-2);border:1px solid var(--border);
   border-radius:8px;color:var(--text-primary);font-family:inherit;font-size:14px;font-weight:600;
-  padding:0 12px;outline:none;
+  padding:0 44px 0 12px;outline:none;
+  -webkit-appearance:none;-moz-appearance:none;appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238F908D' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 18px center;background-size:16px 16px;
+}
+html[data-theme="light"] .stats-select{
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238F895F' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
 }
 .stats-select:disabled{opacity:0.5;}
 .stats-download-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
@@ -994,6 +1000,12 @@ nav.bottombar button.active .indicator{
         </div>
 
         <button class="theme-btn active" style="width:100%;margin-top:8px;" onclick="showChangePinForm()" id="app-lock-change-btn">Змінити PIN</button>
+      </div>
+
+      <div class="card" id="native-notify-card" style="display:none;">
+        <p class="card-title">Сповіщення на телефоні</p>
+        <p class="body-note" id="native-notify-status" style="margin-top:8px;white-space:pre-line;"></p>
+        <button class="theme-btn active" style="width:100%;margin-top:10px;" onclick="testNativeNotification()">Показати тестове сповіщення</button>
       </div>
 
       <a class="row-card" id="report-issue-item" style="text-decoration:none;color:inherit;" onclick="openReportOverlay('')">
@@ -1728,7 +1740,7 @@ function navigate(screen){
   if (screen === 'reference') openReference();
   if (screen === 'stats') openStats();
   if (screen === 'admin') openAdminStats();
-  if (screen === 'more') refreshAppLockSettingsUI();
+  if (screen === 'more') { refreshAppLockSettingsUI(); refreshNativeNotifyCard(); }
   if (screen === 'docs' || screen === 'howto') logPwaView(screen);
   document.querySelectorAll('nav.bottombar button').forEach(btn => {
     var target = btn.getAttribute('data-screen');
@@ -1821,6 +1833,27 @@ function syncNativeAuth(){
       NahorodyAndroid.clearAuthCode();
     }
   } catch(e){ /* не заважаємо основній роботі застосунку */ }
+}
+
+// Налаштування → «Сповіщення на телефоні»: стан фонової перевірки (лише в Android-оболонці)
+function refreshNativeNotifyCard(){
+  var card = document.getElementById('native-notify-card');
+  if (!card) return;
+  try {
+    if (window.NahorodyAndroid && NahorodyAndroid.getNotifyStatus) {
+      document.getElementById('native-notify-status').textContent = NahorodyAndroid.getNotifyStatus();
+      card.style.display = 'block';
+    } else {
+      card.style.display = 'none';
+    }
+  } catch(e){ card.style.display = 'none'; }
+}
+
+function testNativeNotification(){
+  try {
+    if (window.NahorodyAndroid && NahorodyAndroid.testNotification) NahorodyAndroid.testNotification();
+  } catch(e){}
+  setTimeout(refreshNativeNotifyCard, 600);
 }
 
 function loadDigest(){
