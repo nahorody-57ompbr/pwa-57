@@ -1006,6 +1006,7 @@ nav.bottombar button.active .indicator{
         <p class="card-title">Сповіщення на телефоні</p>
         <p class="body-note" id="native-notify-status" style="margin-top:8px;white-space:pre-line;"></p>
         <button class="theme-btn active" style="width:100%;margin-top:10px;" onclick="testNativeNotification()">Показати тестове сповіщення</button>
+        <button class="theme-btn active" style="width:100%;margin-top:8px;" onclick="allowNativeBackground()">Дозволити роботу у фоні</button>
       </div>
 
       <a class="row-card" id="report-issue-item" style="text-decoration:none;color:inherit;" onclick="openReportOverlay('')">
@@ -1855,6 +1856,18 @@ function testNativeNotification(){
   } catch(e){}
   setTimeout(refreshNativeNotifyCard, 600);
 }
+
+// Кнопка «Дозволити роботу у фоні»: системний запит Android (без пошуку в налаштуваннях телефону)
+function allowNativeBackground(){
+  try {
+    if (window.NahorodyAndroid && NahorodyAndroid.requestBackgroundAccess) NahorodyAndroid.requestBackgroundAccess();
+  } catch(e){}
+}
+
+// Повернулися в застосунок (напр. із системного запиту) — оновлюємо стан на екрані «Налаштування»
+document.addEventListener('visibilitychange', function(){
+  if (document.visibilityState === 'visible' && currentScreen === 'more') refreshNativeNotifyCard();
+});
 
 function loadDigest(){
   syncNativeAuth();
