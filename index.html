@@ -1002,13 +1002,6 @@ nav.bottombar button.active .indicator{
         <button class="theme-btn active" style="width:100%;margin-top:8px;" onclick="showChangePinForm()" id="app-lock-change-btn">Змінити PIN</button>
       </div>
 
-      <div class="card" id="native-notify-card" style="display:none;">
-        <p class="card-title">Сповіщення на телефоні</p>
-        <p class="body-note" id="native-notify-status" style="margin-top:8px;white-space:pre-line;"></p>
-        <button class="theme-btn active" style="width:100%;margin-top:10px;" onclick="testNativeNotification()">Показати тестове сповіщення</button>
-        <button class="theme-btn active" style="width:100%;margin-top:8px;" onclick="allowNativeBackground()">Дозволити роботу у фоні</button>
-      </div>
-
       <a class="row-card" id="report-issue-item" style="text-decoration:none;color:inherit;" onclick="openReportOverlay('')">
         <div class="icon-wrap">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
@@ -1741,7 +1734,7 @@ function navigate(screen){
   if (screen === 'reference') openReference();
   if (screen === 'stats') openStats();
   if (screen === 'admin') openAdminStats();
-  if (screen === 'more') { refreshAppLockSettingsUI(); refreshNativeNotifyCard(); }
+  if (screen === 'more') refreshAppLockSettingsUI();
   if (screen === 'docs' || screen === 'howto') logPwaView(screen);
   document.querySelectorAll('nav.bottombar button').forEach(btn => {
     var target = btn.getAttribute('data-screen');
@@ -1835,39 +1828,6 @@ function syncNativeAuth(){
     }
   } catch(e){ /* не заважаємо основній роботі застосунку */ }
 }
-
-// Налаштування → «Сповіщення на телефоні»: стан фонової перевірки (лише в Android-оболонці)
-function refreshNativeNotifyCard(){
-  var card = document.getElementById('native-notify-card');
-  if (!card) return;
-  try {
-    if (window.NahorodyAndroid && NahorodyAndroid.getNotifyStatus) {
-      document.getElementById('native-notify-status').textContent = NahorodyAndroid.getNotifyStatus();
-      card.style.display = 'block';
-    } else {
-      card.style.display = 'none';
-    }
-  } catch(e){ card.style.display = 'none'; }
-}
-
-function testNativeNotification(){
-  try {
-    if (window.NahorodyAndroid && NahorodyAndroid.testNotification) NahorodyAndroid.testNotification();
-  } catch(e){}
-  setTimeout(refreshNativeNotifyCard, 600);
-}
-
-// Кнопка «Дозволити роботу у фоні»: системний запит Android (без пошуку в налаштуваннях телефону)
-function allowNativeBackground(){
-  try {
-    if (window.NahorodyAndroid && NahorodyAndroid.requestBackgroundAccess) NahorodyAndroid.requestBackgroundAccess();
-  } catch(e){}
-}
-
-// Повернулися в застосунок (напр. із системного запиту) — оновлюємо стан на екрані «Налаштування»
-document.addEventListener('visibilitychange', function(){
-  if (document.visibilityState === 'visible' && currentScreen === 'more') refreshNativeNotifyCard();
-});
 
 function loadDigest(){
   syncNativeAuth();
