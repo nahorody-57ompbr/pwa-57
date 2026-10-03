@@ -716,7 +716,7 @@ nav.bottombar button.active .indicator{
       <h1>Нагороди</h1>
       <p>57 окрема мотопіхотна бригада</p>
     </div>
-    <button class="bell" aria-label="Сповіщення" onclick="openDigest()" style="position:relative;">
+    <button class="bell" aria-label="Повідомлення" onclick="openDigest()" style="position:relative;">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8a6 6 0 00-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
       <span id="bell-dot" style="display:none; position:absolute; top:2px; right:2px; width:9px; height:9px; border-radius:50%; background:var(--zoloto); border:2px solid var(--header-grad-b);"></span>
     </button>
@@ -777,7 +777,7 @@ nav.bottombar button.active .indicator{
 
       <div class="card info-card">
         <div class="icon-wrap">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"><path d="M12 2.8C16.75 2.8 20.6 6.5 20.6 11.2C20.6 15.9 16.75 19.6 12 19.6C10.8 19.6 9.65 19.4 8.6 19L4.4 20.8L5.7 16.7C4.4 15.3 3.4 13.4 3.4 11.2C3.4 6.5 7.25 2.8 12 2.8Z"/><circle cx="13.1" cy="7" r="1.35" fill="currentColor" stroke="none"/><path d="M9.6 10.4C10.8 10.3 12.1 10 13.9 9.4L12.55 15.3C12.45 15.8 12.65 16 13.1 15.85C13.6 15.65 14 15.35 14.4 14.95L14.8 15.45C14.1 16.35 13.2 16.9 12.1 17C10.9 17.1 10.3 16.4 10.6 15.3L11.55 11.5C10.9 11.6 10.2 11.7 9.6 11.9Z" fill="currentColor" stroke="none"/></svg>
         </div>
         <div>
           <p class="info-label">Довідково</p>
@@ -831,9 +831,9 @@ nav.bottombar button.active .indicator{
         <button class="back-btn" onclick="navigate('home')">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
-        <h2>Сповіщення</h2>
+        <h2>Повідомлення</h2>
       </div>
-      <div id="digest-body"><div class="search-loading">Завантажую сповіщення...</div></div>
+      <div id="digest-body"><div class="search-loading">Завантажую повідомлення...</div></div>
     </section>
 
     <!-- REFERENCE -->
@@ -1057,7 +1057,7 @@ nav.bottombar button.active .indicator{
       </div>
 
       <div class="card">
-        <p class="card-title">Додати сповіщення (що нового)</p>
+        <p class="card-title">Додати повідомлення (що нового)</p>
         <div class="search-input-row" style="margin-top:10px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
           <input type="text" id="admin-notif-title" placeholder="Заголовок">
@@ -1117,7 +1117,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '82';
+var APP_WEB_VERSION = '83';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1791,7 +1791,7 @@ function downloadBlobFallback(byteArray, filename, mime){
 }
 
 
-// ---------- Сповіщення (дзвіночок): дайджест + "що нового" ----------
+// ---------- Повідомлення (дзвіночок): дайджест + "що нового" ----------
 // Список показує все, що є за останні 30 днів (обмеження на бекенді,
 // NOTIF_MAX_AGE_DAYS) — прочитане не зникає одразу, а лишається видимим до
 // природного "зістарювання". "Прочитане" локально на пристрої відповідає
@@ -1871,6 +1871,37 @@ function loadDigest(){
     .catch(function(){ /* тихо ігноруємо — дзвіночок просто лишиться без позначки */ });
 }
 
+// Дата повідомлення для сортування. Дайджест за місяць з'являється 1-го числа наступного місяця.
+var UA_MONTHS = ['січень','лютий','березень','квітень','травень','червень','липень','серпень','вересень','жовтень','листопад','грудень'];
+
+function notifTimestamp(item){
+  try {
+    if (item.type === 'digest') {
+      var y, m;
+      var km = String(item.monthKey || '').match(/(\d{4})\D?(\d{1,2})/);
+      if (km) {
+        y = parseInt(km[1], 10); m = parseInt(km[2], 10) - 1;
+      } else {
+        var lm = String(item.monthLabel || '').toLowerCase().match(/([а-яіїєґ']+)\s+(\d{4})/);
+        if (lm) { m = UA_MONTHS.indexOf(lm[1]); y = parseInt(lm[2], 10); }
+      }
+      if (y !== undefined && m !== undefined && m >= 0) return new Date(y, m + 1, 1).getTime();
+      return 0;
+    }
+    var dm = String(item.date || '').match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})/);
+    if (dm) return new Date(parseInt(dm[3], 10), parseInt(dm[2], 10) - 1, parseInt(dm[1], 10)).getTime();
+  } catch(e){}
+  return 0;
+}
+
+// Новіші зверху; для однакової дати лишається порядок, у якому їх віддав сервер
+function sortNotifsNewestFirst(items){
+  return items
+    .map(function(it, i){ return { it: it, i: i, t: notifTimestamp(it) }; })
+    .sort(function(a, b){ return (b.t - a.t) || (a.i - b.i); })
+    .map(function(x){ return x.it; });
+}
+
 function renderNotifCard(item){
   if (item.type === 'digest') {
     return '<div class="card digest-card" style="margin-bottom:12px;">' +
@@ -1907,9 +1938,9 @@ function openDigest(){
 
   function render(){
     if (notifItems.length === 0) {
-      body.innerHTML = '<p class="placeholder-note">Немає сповіщень.</p>';
+      body.innerHTML = '<p class="placeholder-note">Немає повідомлень.</p>';
     } else {
-      body.innerHTML = notifItems.map(renderNotifCard).join('');
+      body.innerHTML = sortNotifsNewestFirst(notifItems).map(renderNotifCard).join('');
     }
 
     markNotifIdsRead(notifItems.map(function(it){ return it.id; }));
@@ -1920,13 +1951,13 @@ function openDigest(){
   if (notifItems) {
     render();
   } else {
-    body.innerHTML = '<div class="search-loading">Завантажую сповіщення...</div>';
+    body.innerHTML = '<div class="search-loading">Завантажую повідомлення...</div>';
     var url = API_BASE_URL + '?action=notifications&code=' + encodeURIComponent(getAuthCode());
     fetch(url)
       .then(function(res){ return res.json(); })
       .then(function(data){
         if (data && data.ok) { notifItems = data.items; render(); }
-        else body.innerHTML = '<p class="placeholder-note">Не вдалося завантажити сповіщення.</p>';
+        else body.innerHTML = '<p class="placeholder-note">Не вдалося завантажити повідомлення.</p>';
       })
       .catch(function(){
         body.innerHTML = '<p class="placeholder-note">Немає з\'єднання з сервером.</p>';
@@ -2413,7 +2444,7 @@ function escapeHtml(str){
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// Легка підтримка форматування для тексту сповіщень "що нового": **жирний**
+// Легка підтримка форматування для тексту повідомлень "що нового": **жирний**
 // та рядки, що починаються з "- " або "• ", стають маркованим списком.
 // Все інше лишається звичайним escape-текстом (жодного довільного HTML).
 function formatNotifText(text){
