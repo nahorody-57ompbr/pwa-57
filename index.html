@@ -233,12 +233,12 @@ main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px calc(90px + var(-
 .row-card .chevron{width:16px;height:16px;color:var(--zoloto);flex-shrink:0;}
 
 /* Info card */
-.info-card{display:flex;align-items:center;gap:12px;}
+.info-card{display:flex;align-items:center;gap:14px;}
 .info-card .icon-wrap{
-  width:32px;height:32px;flex-shrink:0;border-radius:50%;border:1px solid var(--border);
-  display:flex;align-items:center;justify-content:center;color:var(--text-secondary);
+  width:38px;height:38px;flex-shrink:0;border-radius:8px;background:var(--surface-2);
+  display:flex;align-items:center;justify-content:center;color:var(--zoloto);
 }
-.info-card .icon-wrap svg{width:16px;height:16px;}
+.info-card .icon-wrap svg{width:20px;height:20px;}
 .info-card p{margin:0;font-size:12px;}
 .info-card .info-label{color:var(--text-secondary);text-transform:uppercase;font-size:10px;letter-spacing:0.03em;margin-bottom:2px;}
 
@@ -1117,7 +1117,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '81';
+var APP_WEB_VERSION = '82';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1850,7 +1850,7 @@ function renderAppVersionNote(){
   var text = 'Веб-частина v.' + APP_WEB_VERSION;
   try {
     if (window.NahorodyAndroid && NahorodyAndroid.getAppVersion) {
-      text = 'Версія збірки (застосунку) ' + NahorodyAndroid.getAppVersion() + ' - ' + text;
+      text = 'Версія застосунку ' + NahorodyAndroid.getAppVersion() + ' - ' + text;
     }
   } catch(e){}
   el.textContent = text;
