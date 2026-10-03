@@ -1117,7 +1117,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '80';
+var APP_WEB_VERSION = '81';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1847,10 +1847,10 @@ function syncNativeTheme(){
 function renderAppVersionNote(){
   var el = document.getElementById('app-version-note');
   if (!el) return;
-  var text = 'Веб-частина v' + APP_WEB_VERSION;
+  var text = 'Веб-частина v.' + APP_WEB_VERSION;
   try {
     if (window.NahorodyAndroid && NahorodyAndroid.getAppVersion) {
-      text = 'Застосунок ' + NahorodyAndroid.getAppVersion() + ' · ' + text;
+      text = 'Версія збірки (застосунку) ' + NahorodyAndroid.getAppVersion() + ' - ' + text;
     }
   } catch(e){}
   el.textContent = text;
