@@ -7,6 +7,11 @@
 <script>
 (function(){
   try {
+    if (window.NahorodyAndroid || /NahorodyApp\//.test(navigator.userAgent)) {
+      document.documentElement.classList.add('native-app');
+    }
+  } catch(e){}
+  try {
     var saved = localStorage.getItem('nagorody_theme');
     if (saved === 'light') {
       document.documentElement.setAttribute('data-theme', 'light');
@@ -139,6 +144,11 @@ main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px calc(90px + var(-
   #screen-home.active{display:flex;flex-direction:column;height:100%;justify-content:space-between;}
   #screen-home.active > *{flex-shrink:0;}
 }
+/* Android-застосунок (WebView) не повідомляє display-mode: standalone,
+   тому для нього те саме правило вмикається окремо */
+html.native-app main.home-fit{overflow:hidden;}
+html.native-app #screen-home.active{display:flex;flex-direction:column;height:100%;justify-content:space-between;}
+html.native-app #screen-home.active > *{flex-shrink:0;}
 
 .card{
   background:var(--surface-1);
@@ -1117,7 +1127,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '83';
+var APP_WEB_VERSION = '84';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
