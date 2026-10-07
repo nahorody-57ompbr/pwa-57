@@ -150,6 +150,27 @@ html.native-app main.home-fit{overflow:hidden;}
 html.native-app #screen-home.active{display:flex;flex-direction:column;height:100%;justify-content:space-between;}
 html.native-app #screen-home.active > *{flex-shrink:0;}
 
+/* Головний екран без скролу: запас знизу — лише висота нижньої панелі (~55px) і невеликий відступ */
+@media (display-mode: standalone){
+  main.home-fit{padding-bottom:calc(64px + var(--safe-bottom));}
+}
+html.native-app main.home-fit{padding-bottom:calc(64px + var(--safe-bottom));}
+
+/* Невисокі екрани (маленькі iPhone та Android): щільніший головний екран */
+@media (display-mode: standalone) and (max-height: 740px){
+  #screen-home .welcome-card{min-height:104px;}
+  #screen-home .welcome-card h2{margin:3px 0 8px;padding-bottom:8px;}
+  #screen-home .card-title{margin-bottom:8px;}
+  #screen-home .btn-primary{margin-top:8px !important;}
+}
+@media (max-height: 740px){
+  html.native-app #screen-home .welcome-card{min-height:104px;}
+  html.native-app #screen-home .welcome-card h2{margin:3px 0 8px;padding-bottom:8px;}
+  html.native-app #screen-home .card-title{margin-bottom:8px;}
+  html.native-app #screen-home .btn-primary{margin-top:8px !important;}
+}
+
+
 .card{
   background:var(--surface-1);
   border:1px solid var(--border-soft);
@@ -1127,7 +1148,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '84';
+var APP_WEB_VERSION = '85';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1747,6 +1768,7 @@ function navigate(screen){
     document.getElementById('screen-' + s).classList.toggle('active', s === screen);
   });
   document.getElementById('main').classList.toggle('home-fit', screen === 'home');
+  if (screen === 'home') requestAnimationFrame(updateHomeFit);
   if (screen === 'reference') openReference();
   if (screen === 'stats') openStats();
   if (screen === 'admin') openAdminStats();
@@ -1844,6 +1866,37 @@ function syncNativeAuth(){
     }
   } catch(e){ /* не заважаємо основній роботі застосунку */ }
 }
+
+// Головний екран: якщо весь вміст влазить — скролу немає (як і задумано);
+// якщо екран замалий і нижній блок не вміщається — дозволяємо прокрутку, щоб його було видно
+function updateHomeFit(){
+  var main = document.getElementById('main');
+  var home = document.getElementById('screen-home');
+  if (!main || !home || currentScreen !== 'home') return;
+  main.classList.add('home-fit');
+  if (home.scrollHeight - home.clientHeight > 1) main.classList.remove('home-fit');
+}
+
+(function(){
+  var timer = null;
+  function schedule(){
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(function(){ timer = null; updateHomeFit(); }, 80);
+  }
+  function init(){
+    window.addEventListener('resize', schedule);
+    window.addEventListener('orientationchange', schedule);
+    window.addEventListener('load', schedule);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
+    var home = document.getElementById('screen-home');
+    if (home && window.MutationObserver) {
+      new MutationObserver(schedule).observe(home, { childList: true, subtree: true, characterData: true });
+    }
+    schedule();
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+})();
 
 // Android-оболонка: повідомляємо поточну тему, щоб її власні вікна були в тому ж стилі
 function syncNativeTheme(){
