@@ -140,13 +140,11 @@ main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px calc(90px + var(-
    людина встановила застосунок за особистим посиланням — головний екран
    поводиться як звичайний скрольований екран, щоб не виглядати "завислим". */
 @media (display-mode: standalone){
-  main.home-fit{overflow:hidden;}
   #screen-home.active{display:flex;flex-direction:column;height:100%;justify-content:space-between;}
   #screen-home.active > *{flex-shrink:0;}
 }
 /* Android-застосунок (WebView) не повідомляє display-mode: standalone,
    тому для нього те саме правило вмикається окремо */
-html.native-app main.home-fit{overflow:hidden;}
 html.native-app #screen-home.active{display:flex;flex-direction:column;height:100%;justify-content:space-between;}
 html.native-app #screen-home.active > *{flex-shrink:0;}
 
@@ -1148,7 +1146,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '86';
+var APP_WEB_VERSION = '87';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1768,7 +1766,7 @@ function navigate(screen){
     document.getElementById('screen-' + s).classList.toggle('active', s === screen);
   });
   document.getElementById('main').classList.toggle('home-fit', screen === 'home');
-  if (screen === 'home') requestAnimationFrame(updateHomeFit);
+  if (screen === 'home') syncAppHeight();
   if (screen === 'reference') openReference();
   if (screen === 'stats') openStats();
   if (screen === 'admin') openAdminStats();
@@ -1867,52 +1865,38 @@ function syncNativeAuth(){
   } catch(e){ /* не заважаємо основній роботі застосунку */ }
 }
 
-// Головний екран: якщо весь вміст влазить — скролу немає (як і задумано);
-// якщо екран замалий і нижній блок не вміщається — дозволяємо прокрутку, щоб його було видно
-function updateHomeFit(){
-  var main = document.getElementById('main');
-  var home = document.getElementById('screen-home');
-  var nav = document.querySelector('nav.bottombar');
-  if (!main || !home || !nav || currentScreen !== 'home') return;
-  var last = home.lastElementChild;
-  if (!last) return;
-
-  // Міряємо від верху прокрутки; потім повертаємо позицію, якщо скрол потрібен
-  var savedScroll = main.scrollTop;
-  main.scrollTop = 0;
-  main.classList.add('home-fit');
-
-  // Вміст влазить, якщо його нижній край вище за верхній край нижньої панелі
-  // (міряємо за положенням блоків, а не за scrollHeight: у Safari висота
-  // головного екрана не завжди обмежується контейнером)
-  var contentBottom = last.getBoundingClientRect().bottom;
-  var limit = nav.getBoundingClientRect().top - 6;
-
-  if (contentBottom > limit) {
-    main.classList.remove('home-fit');
-    main.scrollTop = savedScroll;
-  }
+// Висота застосунку = реальна висота видимої області. На iPhone (особливо в режимі
+// встановленого PWA) одиниці vh/dvh можуть давати більше, ніж видно на екрані: тоді
+// нижня частина вмісту ховається під нижньою панеллю, а скрол не вмикається.
+function syncAppHeight(){
+  try {
+    var app = document.getElementById('app');
+    if (!app) return;
+    var h = window.innerHeight;
+    if (h > 0 && Math.abs(app.getBoundingClientRect().height - h) > 1) {
+      app.style.height = h + 'px';
+    }
+  } catch(e){}
 }
 
 (function(){
   var timer = null;
   function schedule(){
     if (timer) clearTimeout(timer);
-    timer = setTimeout(function(){ timer = null; updateHomeFit(); }, 80);
+    timer = setTimeout(function(){ timer = null; syncAppHeight(); }, 50);
   }
-  function init(){
-    window.addEventListener('resize', schedule);
-    window.addEventListener('orientationchange', schedule);
-    window.addEventListener('load', schedule);
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(schedule);
-    var home = document.getElementById('screen-home');
-    if (home && window.MutationObserver) {
-      new MutationObserver(schedule).observe(home, { childList: true, subtree: true, characterData: true });
-    }
+  window.addEventListener('resize', schedule);
+  window.addEventListener('orientationchange', schedule);
+  window.addEventListener('pageshow', schedule);
+  window.addEventListener('load', function(){
     schedule();
-  }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
-  else init();
+    setTimeout(syncAppHeight, 500);
+    setTimeout(syncAppHeight, 1500);
+  });
+  document.addEventListener('visibilitychange', function(){
+    if (document.visibilityState === 'visible') schedule();
+  });
+  syncAppHeight();
 })();
 
 // Android-оболонка: повідомляємо поточну тему, щоб її власні вікна були в тому ж стилі
