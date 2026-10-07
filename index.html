@@ -1148,7 +1148,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '85';
+var APP_WEB_VERSION = '86';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1872,9 +1872,26 @@ function syncNativeAuth(){
 function updateHomeFit(){
   var main = document.getElementById('main');
   var home = document.getElementById('screen-home');
-  if (!main || !home || currentScreen !== 'home') return;
+  var nav = document.querySelector('nav.bottombar');
+  if (!main || !home || !nav || currentScreen !== 'home') return;
+  var last = home.lastElementChild;
+  if (!last) return;
+
+  // Міряємо від верху прокрутки; потім повертаємо позицію, якщо скрол потрібен
+  var savedScroll = main.scrollTop;
+  main.scrollTop = 0;
   main.classList.add('home-fit');
-  if (home.scrollHeight - home.clientHeight > 1) main.classList.remove('home-fit');
+
+  // Вміст влазить, якщо його нижній край вище за верхній край нижньої панелі
+  // (міряємо за положенням блоків, а не за scrollHeight: у Safari висота
+  // головного екрана не завжди обмежується контейнером)
+  var contentBottom = last.getBoundingClientRect().bottom;
+  var limit = nav.getBoundingClientRect().top - 6;
+
+  if (contentBottom > limit) {
+    main.classList.remove('home-fit');
+    main.scrollTop = savedScroll;
+  }
 }
 
 (function(){
