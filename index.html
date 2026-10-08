@@ -130,7 +130,7 @@ header.topbar .bell{
 header.topbar .bell svg{width:22px;height:22px;}
 
 /* SCREENS */
-main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px calc(90px + var(--safe-bottom));}
+main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px 16px;}
 .screen{display:none;}
 .screen.active{display:block;animation:fadein .15s ease;}
 @keyframes fadein{from{opacity:0}to{opacity:1}}
@@ -147,12 +147,6 @@ main{flex:1;overflow-y:auto;padding:clamp(6px, 2vh, 16px) 16px calc(90px + var(-
    тому для нього те саме правило вмикається окремо */
 html.native-app #screen-home.active{display:flex;flex-direction:column;height:100%;justify-content:space-between;}
 html.native-app #screen-home.active > *{flex-shrink:0;}
-
-/* Головний екран без скролу: запас знизу — лише висота нижньої панелі (~55px) і невеликий відступ */
-@media (display-mode: standalone){
-  main.home-fit{padding-bottom:calc(64px + var(--safe-bottom));}
-}
-html.native-app main.home-fit{padding-bottom:calc(64px + var(--safe-bottom));}
 
 /* Невисокі екрани (маленькі iPhone та Android): щільніший головний екран */
 @media (display-mode: standalone) and (max-height: 740px){
@@ -388,7 +382,7 @@ html[data-theme="light"] .stats-select{
 
 /* Bottom nav */
 nav.bottombar{
-  position:fixed;left:0;right:0;bottom:0;
+  position:relative;flex-shrink:0;width:100%;
   max-width:520px;margin:0 auto;
   background:var(--surface-1);border-top:1px solid var(--border-soft);
   display:flex;justify-content:space-around;align-items:stretch;
@@ -524,6 +518,14 @@ nav.bottombar button.active .indicator{
 }
 .admin-section-title .icon-wrap svg{width:15px;height:15px;}
 .admin-section-title p{margin:0;}
+.admin-user-search{
+  width:100%;box-sizing:border-box;height:46px;margin:12px 0 6px;
+  background:var(--surface-2);border:1px solid var(--border);border-radius:10px;
+  color:var(--text-primary);font-family:inherit;font-size:16px;padding:0 14px;outline:none;
+  -webkit-appearance:none;appearance:none;
+}
+.admin-user-search::placeholder{color:var(--text-muted);}
+.admin-user-search:focus{border-color:var(--zoloto);}
 .admin-user-row{
   display:flex;align-items:center;gap:12px;background:var(--surface-2);
   border:1px solid var(--border-soft);border-radius:10px;padding:10px 12px;margin-top:10px;
@@ -1146,7 +1148,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '87';
+var APP_WEB_VERSION = '88';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1920,6 +1922,76 @@ function renderAppVersionNote(){
   el.textContent = text;
 }
 
+// Адмін-панель: фільтр списку користувачів за ПІБ або підрозділом
+function filterAdminUsers(query){
+  var words = String(query || '').toLowerCase().split(/\s+/).filter(function(w){ return w.length > 0; });
+  var rows = document.querySelectorAll('.admin-user-row');
+  var shown = { active: 0, inactive: 0 };
+  for (var i = 0; i < rows.length; i++) {
+    var text = (rows[i].textContent || '').toLowerCase();
+    var ok = true;
+    for (var w = 0; w < words.length; w++) {
+      if (text.indexOf(words[w]) === -1) { ok = false; break; }
+    }
+    rows[i].style.display = ok ? '' : 'none';
+    if (ok) shown[rows[i].classList.contains('is-active') ? 'active' : 'inactive']++;
+  }
+  var ta = document.getElementById('admin-title-active');
+  var ti = document.getElementById('admin-title-inactive');
+  var searching = words.length > 0;
+  if (ta) ta.style.display = (searching && shown.active === 0) ? 'none' : '';
+  if (ti) ti.style.display = (searching && shown.inactive === 0) ? 'none' : '';
+  var empty = document.getElementById('admin-search-empty');
+  if (empty) empty.style.display = (searching && shown.active + shown.inactive === 0) ? 'block' : 'none';
+}
+
+// Службова діагностика розкладки: п'ять швидких торкань по рядку версії внизу «Налаштувань»
+function showLayoutDiagnostics(){
+  function q(sel){ return document.querySelector(sel); }
+  function box(el){
+    if (!el) return 'немає';
+    var b = el.getBoundingClientRect();
+    return Math.round(b.top) + ' … ' + Math.round(b.bottom) + ' (h=' + Math.round(b.height) + ')';
+  }
+  var probe = document.createElement('div');
+  probe.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:0;padding-bottom:env(safe-area-inset-bottom,0px);visibility:hidden;';
+  document.body.appendChild(probe);
+  var safeBottom = getComputedStyle(probe).paddingBottom;
+  document.body.removeChild(probe);
+  var main = q('#main');
+  var lines = [
+    'Веб-частина v.' + APP_WEB_VERSION,
+    'innerHeight ' + window.innerHeight + ', innerWidth ' + window.innerWidth,
+    'screen ' + screen.width + 'x' + screen.height + ', visualViewport ' + (window.visualViewport ? Math.round(window.visualViewport.height) : '-'),
+    'standalone: ' + (window.navigator.standalone === true) + ', display-mode: ' + matchMedia('(display-mode: standalone)').matches,
+    'safe-bottom: ' + safeBottom,
+    '#app: ' + box(q('#app')),
+    'header: ' + box(q('header')),
+    'main: ' + box(main) + ' client=' + (main ? main.clientHeight : '-') + ' scroll=' + (main ? main.scrollHeight : '-') + ' top=' + (main ? main.scrollTop : '-'),
+    'home: ' + box(q('#screen-home')),
+    'info-card: ' + box(q('.info-card')),
+    'nav: ' + box(q('nav.bottombar')),
+    'main class: ' + (main ? main.className : '-')
+  ];
+  var ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.85);color:#fff;padding:60px 18px 18px;font:12px/1.5 monospace;white-space:pre-wrap;overflow:auto;';
+  ov.textContent = lines.join('\n') + '\n\n(торкніться, щоб закрити)';
+  ov.onclick = function(){ document.body.removeChild(ov); };
+  document.body.appendChild(ov);
+}
+
+(function(){
+  var taps = 0, timer = null;
+  document.addEventListener('click', function(e){
+    var t = e.target;
+    if (!t || t.id !== 'app-version-note') return;
+    taps++;
+    clearTimeout(timer);
+    timer = setTimeout(function(){ taps = 0; }, 2500);
+    if (taps >= 5) { taps = 0; showLayoutDiagnostics(); }
+  });
+})();
+
 function loadDigest(){
   syncNativeAuth();
   syncNativeTheme();
@@ -2049,7 +2121,9 @@ function openAdminStats(){
         '<div class="card">' +
         '<p class="card-title">Всього користувачів</p>' +
         '<p class="stats-metric-value" style="text-align:center;">' + data.total + '</p>' +
-        '</div>';
+        '</div>' +
+        '<input type="search" id="admin-user-search" class="admin-user-search" placeholder="Пошук користувача (ПІБ, підрозділ)..." oninput="filterAdminUsers(this.value)" autocomplete="off" autocapitalize="off" spellcheck="false">' +
+        '<p id="admin-search-empty" class="body-note" style="display:none;margin:6px 2px;">Нікого не знайдено.</p>';
 
       var personIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>';
       var peopleIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.3 3.1-6 7-6s7 2.7 7 6"/><circle cx="17" cy="8" r="2.5"/><path d="M15.5 14.2c2.9.6 4.5 2.6 4.5 5.8"/></svg>';
@@ -2070,7 +2144,7 @@ function openAdminStats(){
           '</div>';
       }
 
-      html += '<div class="admin-section-title"><div class="icon-wrap">' + peopleIcon + '</div><p class="card-title" style="margin:0;">Активні за 7 днів (' + data.active.length + ')</p></div>';
+      html += '<div class="admin-section-title" id="admin-title-active"><div class="icon-wrap">' + peopleIcon + '</div><p class="card-title" style="margin:0;">Активні за 7 днів (' + data.active.length + ')</p></div>';
       if (data.active.length === 0) {
         html += '<p class="body-note">Немає активних користувачів за останній тиждень.</p>';
       } else {
@@ -2079,7 +2153,7 @@ function openAdminStats(){
         }
       }
 
-      html += '<div class="admin-section-title" style="margin-top:18px;"><div class="icon-wrap">' + peopleIcon + '</div><p class="card-title" style="margin:0;">Неактивні (' + data.inactive.length + ')</p></div>';
+      html += '<div class="admin-section-title" id="admin-title-inactive" style="margin-top:18px;"><div class="icon-wrap">' + peopleIcon + '</div><p class="card-title" style="margin:0;">Неактивні (' + data.inactive.length + ')</p></div>';
       if (data.inactive.length === 0) {
         html += '<p class="body-note">Усі користувачі заходили протягом останнього тижня.</p>';
       } else {
