@@ -490,6 +490,12 @@ nav.bottombar button.active .indicator{
 .forced-pin-code-value{font-size:20px;font-weight:800;color:var(--zoloto);letter-spacing:0.1em;margin:0 0 6px;}
 .forced-pin-code-hint{font-size:11px;color:var(--text-secondary);margin:0;line-height:1.4;}
 .lock-keypad button.lock-key-backspace.lock-key-empty{visibility:hidden;}
+/* Режим «Відбиток»: поки користувач сам не натисне «Ввести PIN-код», цифри не показуємо */
+#lock-pin-view.bio-only .lock-pin-dots,
+#lock-pin-view.bio-only .lock-keypad,
+#lock-pin-view.bio-only #lock-pin-error,
+#lock-pin-view.bio-only #lock-pin-lockout-msg,
+#lock-pin-view.bio-only #lock-forgot-btn{display:none !important;}
 
 /* Власне спливаюче вікно замість системного confirm() — без назви домену */
 #custom-confirm-overlay{
@@ -652,7 +658,8 @@ nav.bottombar button.active .indicator{
     <p class="auth-error show" id="lock-pin-lockout-msg" style="display:none;"></p>
     <div class="lock-keypad" id="lock-keypad"></div>
     <button class="lock-forgot-btn" id="lock-bio-retry-btn" style="display:none;" onclick="startBiometricUnlock()">Розблокувати відбитком</button>
-    <button class="lock-forgot-btn" onclick="showLockRecoveryView()">Забули PIN?</button>
+    <button class="lock-forgot-btn" id="lock-use-pin-btn" style="display:none;" onclick="showLockPinEntry()">Ввести PIN-код</button>
+    <button class="lock-forgot-btn" id="lock-forgot-btn" onclick="showLockRecoveryView()">Забули PIN?</button>
   </div>
 
   <div class="auth-box" id="lock-recovery-view" style="display:none;">
@@ -1157,7 +1164,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '89';
+var APP_WEB_VERSION = '90';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1453,6 +1460,20 @@ function refreshAppLockSettingsUI(){
 // ---------- Біометрія (лише Android-застосунок версії з підтримкою відбитка) ----------
 var lockBioTimer = null;
 
+// Режим «лише відбиток»: на екрані замка немає цифр, лише підказка й дві кнопки
+function setLockBioOnly(on){
+  var view = document.getElementById('lock-pin-view');
+  if (!view) return;
+  view.classList.toggle('bio-only', !!on);
+  document.getElementById('lock-pin-sub').textContent = on ? 'Прикладіть палець для розблокування' : 'Введіть PIN-код';
+  document.getElementById('lock-use-pin-btn').style.display = on ? 'inline-block' : 'none';
+}
+
+// Користувач сам попросив PIN (або відбиток недоступний) — показуємо цифрову клавіатуру
+function showLockPinEntry(){
+  setLockBioOnly(false);
+}
+
 function nativeBioSupported(){
   try {
     return !!(window.NahorodyAndroid && NahorodyAndroid.isBiometricAvailable && NahorodyAndroid.authenticateBiometric);
@@ -1511,8 +1532,11 @@ window.onNativeBiometricResult = function(purpose, result){
     localStorage.removeItem(LOCK_FAIL_COUNT_KEY);
     localStorage.removeItem(LOCK_LOCKOUT_UNTIL_KEY);
     hideLockGate();
+  } else if (result === 'pin' || result === 'error' || result === 'unavailable') {
+    // натиснуто «PIN-код» у вікні відбитка або відбиток недоступний — показуємо PIN
+    setLockBioOnly(false);
   }
-  // інакше лишається екран PIN-коду (запасний спосіб) і кнопка повторної спроби
+  // 'cancel' (напр. жест «назад») — лишаємо екран із кнопками «Розблокувати відбитком» / «Ввести PIN-код»
 };
 
 function startBiometricUnlock(){
@@ -1589,10 +1613,12 @@ function showLockGate(){
 
   var bioBtn = document.getElementById('lock-bio-retry-btn');
   if (getLockMode() === 'bio') {
+    setLockBioOnly(true);
     if (bioBtn) bioBtn.style.display = 'inline-block';
     startBiometricUnlock();
-  } else if (bioBtn) {
-    bioBtn.style.display = 'none';
+  } else {
+    setLockBioOnly(false);
+    if (bioBtn) bioBtn.style.display = 'none';
   }
 }
 
@@ -3142,6 +3168,13 @@ function renderRefDetail(awardName){
 
     addSection('Опис', data.desc);
     addSection('Кому', data.whom);
+    var posth = (data.posthumous === undefined || data.posthumous === null) ? '' : String(data.posthumous).trim();
+    if (posth) {
+      var pl = posth.toLowerCase();
+      if (pl === 'так' || pl === 'true' || pl === 'yes' || pl === '+') posth = 'Так';
+      else if (pl === 'ні' || pl === 'false' || pl === 'no' || pl === '-') posth = 'Ні';
+      addSection('Посмертне нагородження', posth);
+    }
     if (data.money) addSection('Грошова виплата', data.money);
     addSection('Пільги', data.perks || 'немає');
 
