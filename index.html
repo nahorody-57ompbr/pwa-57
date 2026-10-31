@@ -1164,7 +1164,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '90';
+var APP_WEB_VERSION = '91';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -2732,7 +2732,7 @@ function formatNotifText(text){
     var trimmed = line.trim();
     if (trimmed.indexOf('- ') === 0 || trimmed.indexOf('• ') === 0) {
       if (!inList) { html += '<ul style="margin:4px 0 8px 18px;padding:0;">'; inList = true; }
-      html += '<li style="margin-bottom:4px;color:var(--text-primary);">' + trimmed.substring(2) + '</li>';
+      html += '<li style="margin-bottom:4px;color:var(--text-primary);text-align:justify;">' + trimmed.substring(2) + '</li>';
     } else {
       closeList();
       if (trimmed) html += '<p class="body-note" style="color:var(--text-primary);margin:0 0 8px;text-indent:1.4em;">' + trimmed + '</p>';
