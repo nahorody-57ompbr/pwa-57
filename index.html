@@ -765,6 +765,17 @@ nav.bottombar button.active .indicator{
 
     <!-- HOME -->
     <section class="screen active" id="screen-home">
+      <div class="card" id="update-banner" style="display:none;border-color:var(--zoloto);align-items:flex-start;gap:10px;">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="var(--zoloto)" stroke-width="2.2" style="flex:none;margin-top:1px;"><path d="M12 3v12M7 11l5 5 5-5M5 20h14"/></svg>
+        <div style="flex:1;min-width:0;">
+          <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:var(--text-primary);">Вийшла нова версія застосунку</p>
+          <p id="update-banner-text" style="margin:0;font-size:13px;line-height:1.5;color:var(--text-secondary);"></p>
+          <div style="display:flex;justify-content:flex-end;margin-top:10px;">
+            <button class="theme-btn" onclick="dismissUpdateBanner()">Зрозуміло</button>
+          </div>
+        </div>
+      </div>
+
       <div class="card welcome-card">
         <div class="welcome-content">
           <p class="eyebrow">Вітаю,</p>
@@ -1090,6 +1101,16 @@ nav.bottombar button.active .indicator{
       </div>
 
       <div class="card">
+        <p class="card-title">Актуальна версія застосунку (Android)</p>
+        <p class="body-note" style="margin-top:8px;">Коли вписуєте номер нової версії, користувачі зі старішою побачать банер із підказкою оновитись. Порожнє поле вимикає банер.</p>
+        <div class="search-input-row" style="margin-top:10px;">
+          <input type="text" id="admin-latest-version" placeholder="Напр. 1.9" inputmode="decimal" autocomplete="off">
+        </div>
+        <button class="theme-btn" style="width:100%;margin-top:10px;" onclick="saveLatestApkVersion()">Зберегти</button>
+        <p class="body-note" id="admin-latest-version-note" style="margin-top:8px;display:none;"></p>
+      </div>
+
+      <div class="card">
         <p class="card-title">Додати користувача</p>
         <div class="search-input-row" style="margin-top:10px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
@@ -1164,10 +1185,12 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '92';
+var APP_WEB_VERSION = '93';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
+const LATEST_APK_KEY = 'nagorody_latest_apk';
+const UPDATE_DISMISSED_KEY = 'nagorody_update_dismissed';
 const THEME_STORAGE_KEY = 'nagorody_theme';
 
 // ---------- Технічні роботи: глобальний перехоплювач усіх запитів до API ----------
@@ -1238,7 +1261,86 @@ function showApp(user, dataUpdatedAt){
   var reportItem = document.getElementById('report-issue-item');
   if (reportItem) reportItem.style.display = user.isAdmin ? 'none' : 'flex';
 
+  renderUpdateBanner();
   loadDigest();
+}
+
+// ---------- Банер «Вийшла нова версія» (лише Android-застосунок) ----------
+function parseVersionParts(s){
+  var m = String(s || '').match(/^\s*(\d+(?:\.\d+)*)/);
+  return m ? m[1].split('.').map(Number) : null;
+}
+
+function isVersionLess(a, b){
+  var n = Math.max(a.length, b.length);
+  for (var i = 0; i < n; i++) {
+    var x = a[i] || 0, y = b[i] || 0;
+    if (x !== y) return x < y;
+  }
+  return false;
+}
+
+function applyLatestVersion(v){
+  if (typeof v === 'undefined') return; // старий бекенд без цього поля
+  try { localStorage.setItem(LATEST_APK_KEY, String(v || '')); } catch(e){}
+  renderUpdateBanner();
+}
+
+function renderUpdateBanner(){
+  var el = document.getElementById('update-banner');
+  if (!el) return;
+  var show = false;
+  try {
+    if (window.NahorodyAndroid && NahorodyAndroid.getAppVersion) {
+      var latest = localStorage.getItem(LATEST_APK_KEY) || '';
+      var currentRaw = NahorodyAndroid.getAppVersion();
+      var cur = parseVersionParts(currentRaw);
+      var lat = parseVersionParts(latest);
+      if (cur && lat && isVersionLess(cur, lat) && localStorage.getItem(UPDATE_DISMISSED_KEY) !== latest) {
+        show = true;
+        document.getElementById('update-banner-text').textContent =
+          'У вас ' + cur.join('.') + ', актуальна ' + lat.join('.') + '. Знайдіть нову версію в робочому чаті й встановіть поверх старої.';
+      }
+    }
+  } catch(e){}
+  el.style.display = show ? 'flex' : 'none';
+}
+
+function dismissUpdateBanner(){
+  try { localStorage.setItem(UPDATE_DISMISSED_KEY, localStorage.getItem(LATEST_APK_KEY) || ''); } catch(e){}
+  renderUpdateBanner();
+}
+
+// Адмін-панель: зберегти номер актуальної версії
+function saveLatestApkVersion(){
+  var input = document.getElementById('admin-latest-version');
+  var note = document.getElementById('admin-latest-version-note');
+  var v = input.value.trim();
+  if (v && !/^\d+(\.\d+){0,3}$/.test(v)) {
+    note.style.display = 'block';
+    note.style.color = '#C0392B';
+    note.textContent = 'Введіть номер у форматі 1.9 (лише цифри й крапки).';
+    return;
+  }
+  var url = API_BASE_URL + '?action=adminSetLatestVersion&code=' + encodeURIComponent(getAuthCode()) + '&version=' + encodeURIComponent(v);
+  fetch(url)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      note.style.display = 'block';
+      if (data && data.ok) {
+        note.style.color = 'var(--zoloto)';
+        note.textContent = data.latestApkVersion ? ('Збережено: ' + data.latestApkVersion + '. Банер побачать користувачі зі старішою версією.') : 'Збережено: банер вимкнено.';
+        applyLatestVersion(data.latestApkVersion || '');
+      } else {
+        note.style.color = '#C0392B';
+        note.textContent = 'Не вдалося зберегти. Спробуйте ще раз.';
+      }
+    })
+    .catch(function(){
+      note.style.display = 'block';
+      note.style.color = '#C0392B';
+      note.textContent = 'Немає з\'єднання з сервером.';
+    });
 }
 
 function saveAuth(code, user, dataUpdatedAt){
@@ -1277,7 +1379,7 @@ function refreshAuthInBackground(code){
     .then(function(res){ return res.json(); })
     .then(function(data){
       if (data && data.ok) {
-        saveAuth(code, data.user, data.dataUpdatedAt);
+        saveAuth(code, data.user, data.dataUpdatedAt); applyLatestVersion(data.latestApkVersion);
         showApp(data.user, data.dataUpdatedAt);
       } else if (data && data.error === 'invalid_code') {
         // Код видалено адміном (наприклад, через "Видалити" в адмін-панелі) —
@@ -1311,7 +1413,7 @@ function checkAccessCode(code){
     .then(function(data){
       setAuthLoading(false);
       if (data && data.ok) {
-        saveAuth(code, data.user, data.dataUpdatedAt);
+        saveAuth(code, data.user, data.dataUpdatedAt); applyLatestVersion(data.latestApkVersion);
         document.getElementById('auth-gate').classList.add('hidden');
         if (!isAppLockEnabled()) {
           showForcedPinSetup(data.user, data.dataUpdatedAt, code);
@@ -1673,7 +1775,7 @@ async function submitLockRecovery(){
       localStorage.removeItem(LOCK_PIN_LENGTH_KEY);
       localStorage.removeItem(LOCK_FAIL_COUNT_KEY);
       localStorage.removeItem(LOCK_LOCKOUT_UNTIL_KEY);
-      saveAuth(code, data.user, data.dataUpdatedAt);
+      saveAuth(code, data.user, data.dataUpdatedAt); applyLatestVersion(data.latestApkVersion);
       hideLockGate();
       showForcedPinSetup(data.user, data.dataUpdatedAt, code);
     } else {
@@ -2249,6 +2351,8 @@ function openAdminStats(){
       }
 
       renderMaintenanceToggle(data.maintenanceMode);
+      var latestInput = document.getElementById('admin-latest-version');
+      if (latestInput) latestInput.value = data.latestApkVersion || '';
 
       var html =
         '<div class="card">' +
