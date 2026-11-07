@@ -766,7 +766,7 @@ nav.bottombar button.active .indicator{
     <!-- HOME -->
     <section class="screen active" id="screen-home">
       <div class="card" id="update-banner" style="display:none;border-color:var(--zoloto);background:rgba(243,146,0,0.12);align-items:flex-start;gap:12px;">
-        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="var(--zoloto)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:0;"><path d="M12 3v12M7 11l5 5 5-5M5 20h14"/></svg>
+        <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="var(--zoloto)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" style="flex:none;margin-top:0;"><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M7 11l5 5 5-5"/><path d="M12 4v12"/></svg>
         <div style="flex:1;min-width:0;">
           <p style="margin:0 0 4px;font-size:14px;font-weight:600;color:var(--text-primary);">Вийшла нова версія застосунку</p>
           <p id="update-banner-text" style="margin:0;font-size:13px;line-height:1.5;color:var(--text-secondary);"></p>
@@ -1097,7 +1097,7 @@ nav.bottombar button.active .indicator{
       <div class="card">
         <p class="card-title">Режим технічних робіт</p>
         <p class="body-note" id="maintenance-status" style="margin-top:8px;">Перевіряю статус...</p>
-        <button class="theme-btn" id="maintenance-toggle-btn" style="width:100%;margin-top:10px;" onclick="toggleMaintenanceMode()">...</button>
+        <button class="theme-btn active" id="maintenance-toggle-btn" style="width:100%;margin-top:10px;" onclick="toggleMaintenanceMode()">...</button>
       </div>
 
       <div class="card">
@@ -1106,7 +1106,7 @@ nav.bottombar button.active .indicator{
         <div class="search-input-row" style="margin-top:10px;">
           <input type="text" id="admin-latest-version" placeholder="Напр. 1.9" inputmode="decimal" autocomplete="off">
         </div>
-        <button class="theme-btn" style="width:100%;margin-top:10px;" onclick="saveLatestApkVersion()">Зберегти</button>
+        <button class="theme-btn active" style="width:100%;margin-top:10px;" onclick="saveLatestApkVersion()">Зберегти</button>
         <p class="body-note" id="admin-latest-version-note" style="margin-top:8px;display:none;"></p>
       </div>
 
@@ -1185,7 +1185,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '95';
+var APP_WEB_VERSION = '96';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -2438,7 +2438,7 @@ function renderMaintenanceToggle(isOn){
   if (isOn) {
     statusEl.innerHTML = 'Зараз: <b style="color:#C0392B;">увімкнено</b> — всі, крім тебе, бачать повідомлення "Технічні роботи".';
     btn.textContent = 'Вимкнути технічні роботи';
-    btn.classList.remove('active');
+    btn.classList.add('active');
   } else {
     statusEl.innerHTML = 'Зараз: <b style="color:var(--zoloto);">вимкнено</b> — застосунок працює для всіх як звично.';
     btn.textContent = 'Увімкнути технічні роботи';
