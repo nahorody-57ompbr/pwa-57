@@ -379,11 +379,17 @@ html[data-theme="light"] .stats-select{
 .stats-download-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .stats-detail-header{margin:0 0 14px;}
 .stats-detail-header h2{margin:0;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.01em;}
-.unit-head-emblem{width:30px;height:30px;object-fit:contain;flex-shrink:0;}
-.unit-created-line{display:flex;align-items:center;gap:6px;margin:-6px 0 14px;font-size:12px;color:var(--text-secondary);}
-.unit-created-line svg{width:14px;height:14px;flex-shrink:0;}
+.unit-head-card{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.unit-head-card img{width:60px;height:60px;object-fit:contain;flex-shrink:0;}
+.unit-head-name{margin:0;font-size:17px;font-weight:700;line-height:1.25;}
+.unit-head-created{display:flex;align-items:center;gap:6px;margin:4px 0 0;font-size:13px;color:var(--text-secondary);}
+.unit-head-created svg{width:14px;height:14px;flex-shrink:0;}
 .stats-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
-.stats-metric-grid .stats-metric-card{margin-bottom:0;}
+.stats-metric-grid .stats-metric-card{margin-bottom:0;text-align:center;}
+.stats-metric-grid .stats-metric-value{font-size:28px;color:var(--zoloto);line-height:1.15;}
+.stats-metric-grid .stats-metric-label{font-size:12px;text-transform:none;letter-spacing:0;margin:2px 0 0;}
+.unit-person-count{display:flex;align-items:center;gap:4px;flex-shrink:0;font-size:13px;color:var(--text-secondary);}
+.unit-person-count svg{width:14px;height:14px;}
 
 /* Bottom nav */
 nav.bottombar{
@@ -1190,7 +1196,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '97';
+var APP_WEB_VERSION = '99';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -3803,10 +3809,18 @@ function loadStatsUnitDetail(unitName){
     });
 }
 
+function unitAwardsWord(n){
+  var m100 = n % 100, m10 = n % 10;
+  if (m100 >= 11 && m100 <= 14) return 'нагород';
+  if (m10 === 1) return 'нагорода';
+  if (m10 >= 2 && m10 <= 4) return 'нагороди';
+  return 'нагород';
+}
+
 function renderUnitPeopleList(container, people, query){
   var q = (query || '').toLowerCase();
   var filtered = q ? people.filter(function(p){ return p.name.toLowerCase().indexOf(q) !== -1; }) : people;
-  var LIMIT = 30;
+  var LIMIT = 10;
   container.innerHTML = '';
 
   if (filtered.length === 0) {
@@ -3819,9 +3833,9 @@ function renderUnitPeopleList(container, people, query){
     row.className = 'stats-rank-row';
     row.innerHTML =
       '<div style="flex:1;min-width:0;"><p class="stats-rank-name"></p></div>' +
-      '<span class="stats-rank-count"></span>';
+      '<span class="unit-person-count"><span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></span>';
     row.querySelector('.stats-rank-name').textContent = p.name;
-    row.querySelector('.stats-rank-count').textContent = p.count;
+    row.querySelector('.unit-person-count span').textContent = p.count + ' ' + unitAwardsWord(p.count);
     row.onclick = (function(n){ return function(){ goToPersonFromStats(n); }; })(p.name);
     container.appendChild(row);
   });
@@ -3844,25 +3858,26 @@ function renderStatsUnitDetail(data){
   headerRow.className = 'screen-header stats-detail-header';
   headerRow.innerHTML =
     '<button class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>' +
-    '<img class="unit-head-emblem" src="icons/icon-192.png" alt="">' +
-    '<h2></h2>';
+    '<h2>Підрозділи</h2>';
   headerRow.querySelector('.back-btn').onclick = function(){ statsUnitDetailName = null; renderStatsBody(); };
-  headerRow.querySelector('h2').textContent = data.unit;
   body.appendChild(headerRow);
 
-  if (data.created) {
-    var createdLine = document.createElement('div');
-    createdLine.className = 'unit-created-line';
-    createdLine.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><span></span>';
-    createdLine.querySelector('span').textContent = 'Створено ' + data.created;
-    body.appendChild(createdLine);
-  }
+  var headCard = document.createElement('div');
+  headCard.className = 'card unit-head-card';
+  headCard.innerHTML =
+    '<img src="icons/icon-192.png" alt="">' +
+    '<div style="min-width:0;"><p class="unit-head-name"></p>' +
+    (data.created ? '<p class="unit-head-created"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><span></span></p>' : '') +
+    '</div>';
+  headCard.querySelector('.unit-head-name').textContent = data.unit;
+  if (data.created) headCard.querySelector('.unit-head-created span').textContent = 'Створено ' + data.created;
+  body.appendChild(headCard);
 
   var metricGrid = document.createElement('div');
   metricGrid.className = 'stats-metric-grid';
   metricGrid.innerHTML =
-    '<div class="card stats-metric-card"><p class="stats-metric-label">Всього нагород</p><p class="stats-metric-value">' + data.total + '</p></div>' +
-    '<div class="card stats-metric-card"><p class="stats-metric-label">Нагороджених осіб</p><p class="stats-metric-value">' + (data.peopleCount || 0) + '</p></div>';
+    '<div class="card stats-metric-card"><p class="stats-metric-value">' + data.total + '</p><p class="stats-metric-label">Всього нагород</p></div>' +
+    '<div class="card stats-metric-card"><p class="stats-metric-value">' + (data.peopleCount || 0) + '</p><p class="stats-metric-label">Нагороджених осіб</p></div>';
   body.appendChild(metricGrid);
 
   var chartCard = document.createElement('div');
@@ -3962,24 +3977,23 @@ function renderStatsUnitDetail(data){
 
   if (hasUnitTrend) {
     statsChartTrend = new Chart(document.getElementById('stats-chart-unit-trend'), {
-      type: 'line',
+      type: 'bar',
       data: {
         labels: data.trend.map(function(t){ return t.year; }),
         datasets: [{
           data: data.trend.map(function(t){ return t.count; }),
-          borderColor: colors.accent, backgroundColor: colors.accent + '22',
-          fill: true, tension: 0.3, pointRadius: 4, pointBackgroundColor: colors.accent
+          backgroundColor: colors.accent, borderRadius: 4, maxBarThickness: 36
         }]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { display: false },
-          datalabels: { align: 'top', color: colors.text, font: { weight: 'bold', size: 10 } }
+          datalabels: { anchor: 'end', align: 'end', color: colors.text, font: { weight: 'bold', size: 10 } }
         },
         scales: {
           x: { ticks: { color: colors.text, font: { size: 10 } }, grid: { display: false } },
-          y: { ticks: { color: colors.text, font: { size: 10 } }, grid: { color: colors.grid }, grace: '20%' }
+          y: { beginAtZero: true, ticks: { color: colors.text, font: { size: 10 } }, grid: { color: colors.grid }, grace: '15%' }
         }
       },
       plugins: [ChartDataLabels]
