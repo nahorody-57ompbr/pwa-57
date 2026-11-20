@@ -1198,7 +1198,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '100';
+var APP_WEB_VERSION = '101';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -3846,7 +3846,7 @@ function renderUnitPeopleList(container, people, query){
     var note = document.createElement('p');
     note.className = 'placeholder-note';
     note.style.cssText = 'padding:10px 0 0;font-size:12px;';
-    note.textContent = 'Показано ' + LIMIT + ' з ' + filtered.length + '. Уточніть пошук.';
+    note.textContent = 'Показано перших ' + LIMIT + '. Решту знайдіть за прізвищем у пошуку вище.';
     container.appendChild(note);
   }
 }
