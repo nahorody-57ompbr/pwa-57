@@ -1198,7 +1198,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '101';
+var APP_WEB_VERSION = '102';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -3837,7 +3837,8 @@ function renderUnitPeopleList(container, people, query){
       '<div style="flex:1;min-width:0;"><p class="stats-rank-name"></p></div>' +
       '<span class="unit-person-count"><span></span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg></span>';
     row.querySelector('.stats-rank-name').textContent = p.name;
-    row.querySelector('.unit-person-count span').textContent = p.count + ' ' + unitAwardsWord(p.count);
+    var allCount = p.total && p.total > p.count ? p.total : p.count;
+    row.querySelector('.unit-person-count span').textContent = (allCount > p.count ? p.count + ' з ' + allCount : p.count) + ' ' + unitAwardsWord(allCount);
     row.onclick = (function(n){ return function(){ goToPersonFromStats(n); }; })(p.name);
     container.appendChild(row);
   });
@@ -3920,7 +3921,8 @@ function renderStatsUnitDetail(data){
   if (data.people && data.people.length > 0) {
     var peopleCard = document.createElement('div');
     peopleCard.className = 'card';
-    peopleCard.innerHTML = '<p class="card-title">Нагороджені</p>';
+    peopleCard.innerHTML = '<p class="card-title">Нагороджені</p>' +
+      '<p style="margin:-4px 0 10px;font-size:12px;color:var(--text-secondary);">Кількість нагород у цьому підрозділі</p>';
 
     var pSearchRow = document.createElement('div');
     pSearchRow.className = 'search-input-row';
