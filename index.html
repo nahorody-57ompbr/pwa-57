@@ -379,6 +379,11 @@ html[data-theme="light"] .stats-select{
 .stats-download-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 .stats-detail-header{margin:0 0 14px;}
 .stats-detail-header h2{margin:0;font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.01em;}
+.unit-head-emblem{width:30px;height:30px;object-fit:contain;flex-shrink:0;}
+.unit-created-line{display:flex;align-items:center;gap:6px;margin:-6px 0 14px;font-size:12px;color:var(--text-secondary);}
+.unit-created-line svg{width:14px;height:14px;flex-shrink:0;}
+.stats-metric-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.stats-metric-grid .stats-metric-card{margin-bottom:0;}
 
 /* Bottom nav */
 nav.bottombar{
@@ -1185,7 +1190,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '96';
+var APP_WEB_VERSION = '97';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -3798,6 +3803,38 @@ function loadStatsUnitDetail(unitName){
     });
 }
 
+function renderUnitPeopleList(container, people, query){
+  var q = (query || '').toLowerCase();
+  var filtered = q ? people.filter(function(p){ return p.name.toLowerCase().indexOf(q) !== -1; }) : people;
+  var LIMIT = 30;
+  container.innerHTML = '';
+
+  if (filtered.length === 0) {
+    container.innerHTML = '<p class="placeholder-note" style="padding:16px 0;">Нічого не знайдено.</p>';
+    return;
+  }
+
+  filtered.slice(0, LIMIT).forEach(function(p){
+    var row = document.createElement('div');
+    row.className = 'stats-rank-row';
+    row.innerHTML =
+      '<div style="flex:1;min-width:0;"><p class="stats-rank-name"></p></div>' +
+      '<span class="stats-rank-count"></span>';
+    row.querySelector('.stats-rank-name').textContent = p.name;
+    row.querySelector('.stats-rank-count').textContent = p.count;
+    row.onclick = (function(n){ return function(){ goToPersonFromStats(n); }; })(p.name);
+    container.appendChild(row);
+  });
+
+  if (filtered.length > LIMIT) {
+    var note = document.createElement('p');
+    note.className = 'placeholder-note';
+    note.style.cssText = 'padding:10px 0 0;font-size:12px;';
+    note.textContent = 'Показано ' + LIMIT + ' з ' + filtered.length + '. Уточніть пошук.';
+    container.appendChild(note);
+  }
+}
+
 function renderStatsUnitDetail(data){
   destroyStatsCharts();
   var body = document.getElementById('stats-body');
@@ -3807,15 +3844,26 @@ function renderStatsUnitDetail(data){
   headerRow.className = 'screen-header stats-detail-header';
   headerRow.innerHTML =
     '<button class="back-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg></button>' +
+    '<img class="unit-head-emblem" src="icons/icon-192.png" alt="">' +
     '<h2></h2>';
   headerRow.querySelector('.back-btn').onclick = function(){ statsUnitDetailName = null; renderStatsBody(); };
   headerRow.querySelector('h2').textContent = data.unit;
   body.appendChild(headerRow);
 
-  var metric = document.createElement('div');
-  metric.className = 'card stats-metric-card';
-  metric.innerHTML = '<p class="stats-metric-label">Всього нагород' + (data.year === 'all' ? ' (за весь час)' : ' (' + data.year + ' рік)') + '</p><p class="stats-metric-value">' + data.total + '</p>';
-  body.appendChild(metric);
+  if (data.created) {
+    var createdLine = document.createElement('div');
+    createdLine.className = 'unit-created-line';
+    createdLine.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4.5" width="18" height="16.5" rx="2.5"/><path d="M16 2.5v4M8 2.5v4M3 10h18"/></svg><span></span>';
+    createdLine.querySelector('span').textContent = 'Створено ' + data.created;
+    body.appendChild(createdLine);
+  }
+
+  var metricGrid = document.createElement('div');
+  metricGrid.className = 'stats-metric-grid';
+  metricGrid.innerHTML =
+    '<div class="card stats-metric-card"><p class="stats-metric-label">Всього нагород</p><p class="stats-metric-value">' + data.total + '</p></div>' +
+    '<div class="card stats-metric-card"><p class="stats-metric-label">Нагороджених осіб</p><p class="stats-metric-value">' + (data.peopleCount || 0) + '</p></div>';
+  body.appendChild(metricGrid);
 
   var chartCard = document.createElement('div');
   chartCard.className = 'card chart-card';
@@ -3829,6 +3877,48 @@ function renderStatsUnitDetail(data){
     trendCard.className = 'card chart-card';
     trendCard.innerHTML = '<p class="card-title">Динаміка по роках</p><div class="chart-wrap chart-wrap-trend"><canvas id="stats-chart-unit-trend"></canvas></div>';
     body.appendChild(trendCard);
+  }
+
+  if (data.topAwards && data.topAwards.length > 0) {
+    var topCard = document.createElement('div');
+    topCard.className = 'card';
+    topCard.innerHTML = '<p class="card-title">Найпоширеніші нагороди</p>';
+    data.topAwards.forEach(function(a, idx){
+      var row = document.createElement('div');
+      row.className = 'stats-rank-row';
+      row.innerHTML =
+        '<span class="stats-rank-num">' + (idx + 1) + '</span>' +
+        '<div style="flex:1;min-width:0;"><p class="stats-rank-name" style="white-space:normal;"></p><p class="stats-rank-sub"></p></div>' +
+        '<span class="stats-rank-count"></span>';
+      row.querySelector('.stats-rank-name').textContent = a.name;
+      row.querySelector('.stats-rank-sub').textContent = a.label;
+      row.querySelector('.stats-rank-count').textContent = a.count;
+      topCard.appendChild(row);
+    });
+    body.appendChild(topCard);
+  }
+
+  if (data.people && data.people.length > 0) {
+    var peopleCard = document.createElement('div');
+    peopleCard.className = 'card';
+    peopleCard.innerHTML = '<p class="card-title">Нагороджені</p>';
+
+    var pSearchRow = document.createElement('div');
+    pSearchRow.className = 'search-input-row';
+    pSearchRow.style.marginBottom = '10px';
+    pSearchRow.innerHTML =
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/></svg>' +
+      '<input type="text" id="stats-unit-people-search" placeholder="Пошук за прізвищем...">';
+    peopleCard.appendChild(pSearchRow);
+
+    var pList = document.createElement('div');
+    peopleCard.appendChild(pList);
+    body.appendChild(peopleCard);
+
+    pSearchRow.querySelector('input').addEventListener('input', function(){
+      renderUnitPeopleList(pList, data.people, this.value.trim());
+    });
+    renderUnitPeopleList(pList, data.people, '');
   }
 
   var dlCard = document.createElement('div');
