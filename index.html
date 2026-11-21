@@ -1124,6 +1124,13 @@ nav.bottombar button.active .indicator{
       </div>
 
       <div class="card">
+        <p class="card-title">Перевірка даних</p>
+        <p class="body-note" style="margin-top:8px;">Показує записи в базі, через які статистика може бути неточною. Нічого не змінює.</p>
+        <button class="theme-btn active" id="admin-datacheck-btn" style="width:100%;margin-top:10px;" onclick="runAdminDataCheck()">Перевірити</button>
+        <div id="admin-datacheck-result" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="card">
         <p class="card-title">Додати користувача</p>
         <div class="search-input-row" style="margin-top:10px;">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>
@@ -1198,7 +1205,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '103';
+var APP_WEB_VERSION = '104';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -1353,6 +1360,50 @@ function saveLatestApkVersion(){
       note.style.display = 'block';
       note.style.color = '#C0392B';
       note.textContent = 'Немає з\'єднання з сервером.';
+    });
+}
+
+function runAdminDataCheck(){
+  var btn = document.getElementById('admin-datacheck-btn');
+  var box = document.getElementById('admin-datacheck-result');
+  btn.disabled = true;
+  box.innerHTML = '<p class="body-note">Перевіряю базу...</p>';
+
+  var url = API_BASE_URL + '?action=adminDataCheck&code=' + encodeURIComponent(getAuthCode());
+  fetch(url)
+    .then(function(res){ return res.json(); })
+    .then(function(data){
+      btn.disabled = false;
+      if (!data || !data.ok) {
+        box.innerHTML = '<p class="body-note" style="color:#C0392B;">Не вдалося виконати перевірку.</p>';
+        return;
+      }
+
+      var html = '<p class="body-note" style="margin:0;"><b>Перевірено записів: ' + data.rowsTotal + '</b></p>';
+      data.checks.forEach(function(c){
+        html += '<div style="margin-top:14px;">';
+        html += '<p class="body-note" style="margin:0;"><b>' + escapeHtml(c.title) + '</b> \u2014 ' +
+          (c.count > 0 ? '<span style="color:var(--zoloto);font-weight:700;">' + c.count + '</span>' : 'без зауважень') + '</p>';
+        if (c.count > 0) {
+          html += '<p style="margin:4px 0 6px;font-size:12px;color:var(--text-secondary);">' + escapeHtml(c.hint) + '</p>';
+          c.examples.forEach(function(ex){
+            html += '<p class="body-note" style="margin:3px 0;">' + escapeHtml(ex.label) + (ex.row ? ' \u2014 рядок ' + ex.row : '') + '</p>';
+          });
+          if (c.more > 0) {
+            html += '<p style="margin:3px 0;font-size:12px;color:var(--text-secondary);">і ще ' + c.more + '</p>';
+          }
+        }
+        html += '</div>';
+      });
+
+      html += '<div style="margin-top:14px;"><p class="body-note" style="margin:0;"><b>Записів без дати народження</b> \u2014 ' + data.noDobCount + '</p>' +
+        '<p style="margin:4px 0 0;font-size:12px;color:var(--text-secondary);">Для повних тезок дата народження потрібна, щоб статистика й пошук розрізняли їх.</p></div>';
+
+      box.innerHTML = html;
+    })
+    .catch(function(){
+      btn.disabled = false;
+      box.innerHTML = '<p class="body-note" style="color:#C0392B;">Немає з\'єднання з сервером.</p>';
     });
 }
 
