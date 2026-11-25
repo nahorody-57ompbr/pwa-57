@@ -1205,7 +1205,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '2.0';
+var APP_WEB_VERSION = '2.1';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -3240,10 +3240,24 @@ function getDegreeRank(name){
   return 0;
 }
 
+function appendRichText(el, text){
+  var parts = String(text).split(/\*\*(.+?)\*\*/);
+  parts.forEach(function(part, idx){
+    if (!part) return;
+    if (idx % 2 === 1) {
+      var b = document.createElement('b');
+      b.textContent = part;
+      el.appendChild(b);
+    } else {
+      el.appendChild(document.createTextNode(part));
+    }
+  });
+}
+
 function formatTextBlock(text){
   var wrap = document.createElement('div');
   var paragraphs = text.split(/\n\s*\n/);
-  var bulletChars = /^[-•·*●▪‣]/;
+  var bulletChars = /^(?:[-•·●▪‣]|\*(?!\*))/;
   paragraphs.forEach(function(para){
     var lines = para.split('\n').map(function(l){ return l.trim(); }).filter(Boolean);
     if (lines.length === 0) return;
@@ -3256,7 +3270,7 @@ function formatTextBlock(text){
         var li = document.createElement('li');
         li.className = 'body-note';
         li.style.marginBottom = '2px';
-        li.textContent = l.replace(/^[-•·*●▪‣]\s*/, '');
+        appendRichText(li, l.replace(/^(?:[-•·●▪‣]|\*(?!\*))\s*/, ''));
         ul.appendChild(li);
       });
       wrap.appendChild(ul);
@@ -3268,7 +3282,7 @@ function formatTextBlock(text){
         lp.className = 'body-note';
         if (idx === 0) lp.style.textIndent = '1.4em';
         lp.style.marginTop = idx === 0 ? '0' : '4px';
-        lp.textContent = l;
+        appendRichText(lp, l);
         block.appendChild(lp);
       });
       wrap.appendChild(block);
