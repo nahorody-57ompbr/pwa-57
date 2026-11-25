@@ -1205,7 +1205,7 @@ function offerInstallIfAvailable(){
 
 // ---------- Налаштування API ----------
 // Версія веб-частини: змінюється разом із CACHE_NAME у sw.js
-var APP_WEB_VERSION = '2.1';
+var APP_WEB_VERSION = '2.2';
 
 const API_BASE_URL = 'https://script.google.com/macros/s/AKfycbwJktVQ9C6kpWi8oVb3lSk8CGDxqwkh35x6JwnQgEemlP0ky8qtgK30ZzDseDY9LSXK/exec';
 const AUTH_STORAGE_KEY = 'nagorody_auth';
@@ -3343,6 +3343,18 @@ function renderRefDetail(awardName){
       l.textContent = label;
       card.appendChild(l);
       card.appendChild(formatTextBlock(text));
+    }
+
+    if (data.conditions) {
+      var condBox = document.createElement('div');
+      condBox.style.cssText = 'margin-top:14px;padding:10px 12px;border:1px solid var(--zoloto);border-radius:10px;background:rgba(243,146,0,.12);';
+      var condTitle = document.createElement('p');
+      condTitle.className = 'card-title';
+      condTitle.style.cssText = 'margin:0 0 4px;color:var(--zoloto);';
+      condTitle.textContent = "Обов'язкові умови";
+      condBox.appendChild(condTitle);
+      condBox.appendChild(formatTextBlock(data.conditions));
+      card.appendChild(condBox);
     }
 
     addSection('Опис', data.desc);
